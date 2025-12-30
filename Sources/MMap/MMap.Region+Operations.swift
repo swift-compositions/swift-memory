@@ -28,11 +28,11 @@ extension MMap.Region {
 
         // Unmap the region
         #if os(Windows)
-        if let handle = mappingHandle {
-            try? Kernel.Mmap.unmap(Kernel.Mmap.WindowsMapping(baseAddress: base, mappingHandle: handle))
-        }
+            if let handle = mappingHandle {
+                try? Kernel.Mmap.unmap(Kernel.Mmap.WindowsMapping(baseAddress: base, mappingHandle: handle))
+            }
         #else
-        try? Kernel.Mmap.unmap(addr: base, length: mappingLength)
+            try? Kernel.Mmap.unmap(addr: base, length: mappingLength)
         #endif
 
         // Mark as unmapped (for deinit safety)
@@ -43,79 +43,79 @@ extension MMap.Region {
 // MARK: - Remap
 
 #if !os(Windows)
-extension MMap.Region {
-    /// Remaps the region to a new range.
-    ///
-    /// This is a consuming operation that:
-    /// 1. Unmaps the current region
-    /// 2. Creates a new mapping with the specified range
-    /// 3. Returns the new region
-    ///
-    /// - Parameters:
-    ///   - fileDescriptor: The file descriptor to map.
-    ///   - range: The new range to map.
-    /// - Returns: A new `Region` with the specified range.
-    /// - Throws: `MMap.Error` if remapping fails.
-    ///
-    /// - Note: On Linux, this may use `mremap()` for efficiency when possible.
-    public consuming func remap(
-        fileDescriptor: Kernel.Descriptor,
-        range: Range
-    ) throws(MMap.Error) -> Self {
-        // Capture values before consuming self
-        let capturedAccess = access
-        let capturedSharing = sharing
-        let capturedSafety = safety
+    extension MMap.Region {
+        /// Remaps the region to a new range.
+        ///
+        /// This is a consuming operation that:
+        /// 1. Unmaps the current region
+        /// 2. Creates a new mapping with the specified range
+        /// 3. Returns the new region
+        ///
+        /// - Parameters:
+        ///   - fileDescriptor: The file descriptor to map.
+        ///   - range: The new range to map.
+        /// - Returns: A new `Region` with the specified range.
+        /// - Throws: `MMap.Error` if remapping fails.
+        ///
+        /// - Note: On Linux, this may use `mremap()` for efficiency when possible.
+        public consuming func remap(
+            fileDescriptor: Kernel.Descriptor,
+            range: Range
+        ) throws(MMap.Error) -> Self {
+            // Capture values before consuming self
+            let capturedAccess = access
+            let capturedSharing = sharing
+            let capturedSafety = safety
 
-        // For now, we do unmap + map
-        // Linux optimization with mremap could be added later
-        self.unmap()
+            // For now, we do unmap + map
+            // Linux optimization with mremap could be added later
+            self.unmap()
 
-        return try Self(
-            fileDescriptor: fileDescriptor,
-            range: range,
-            access: capturedAccess,
-            sharing: capturedSharing,
-            safety: capturedSafety
-        )
+            return try Self(
+                fileDescriptor: fileDescriptor,
+                range: range,
+                access: capturedAccess,
+                sharing: capturedSharing,
+                safety: capturedSafety
+            )
+        }
     }
-}
 #endif
 
 #if os(Windows)
-extension MMap.Region {
-    /// Remaps the region to a new range.
-    ///
-    /// This is a consuming operation that:
-    /// 1. Unmaps the current region
-    /// 2. Creates a new mapping with the specified range
-    /// 3. Returns the new region
-    ///
-    /// - Parameters:
-    ///   - fileHandle: The file handle to map.
-    ///   - range: The new range to map.
-    /// - Returns: A new `Region` with the specified range.
-    /// - Throws: `MMap.Error` if remapping fails.
-    public consuming func remap(
-        fileHandle: Kernel.Descriptor,
-        range: Range
-    ) throws(MMap.Error) -> Self {
-        // Capture values before consuming self
-        let capturedAccess = access
-        let capturedSharing = sharing
-        let capturedSafety = safety
+    extension MMap.Region {
+        /// Remaps the region to a new range.
+        ///
+        /// This is a consuming operation that:
+        /// 1. Unmaps the current region
+        /// 2. Creates a new mapping with the specified range
+        /// 3. Returns the new region
+        ///
+        /// - Parameters:
+        ///   - fileHandle: The file handle to map.
+        ///   - range: The new range to map.
+        /// - Returns: A new `Region` with the specified range.
+        /// - Throws: `MMap.Error` if remapping fails.
+        public consuming func remap(
+            fileHandle: Kernel.Descriptor,
+            range: Range
+        ) throws(MMap.Error) -> Self {
+            // Capture values before consuming self
+            let capturedAccess = access
+            let capturedSharing = sharing
+            let capturedSafety = safety
 
-        self.unmap()
+            self.unmap()
 
-        return try Self(
-            fileHandle: fileHandle,
-            range: range,
-            access: capturedAccess,
-            sharing: capturedSharing,
-            safety: capturedSafety
-        )
+            return try Self(
+                fileHandle: fileHandle,
+                range: range,
+                access: capturedAccess,
+                sharing: capturedSharing,
+                safety: capturedSafety
+            )
+        }
     }
-}
 #endif
 
 // MARK: - Access Methods
@@ -233,10 +233,10 @@ extension MMap.Region {
 
         do {
             #if os(Windows)
-            try Kernel.Mmap.sync(addr: base, length: mappingLength)
+                try Kernel.Mmap.sync(addr: base, length: mappingLength)
             #else
-            let flags: Kernel.Mmap.SyncFlags = async ? .async : .sync
-            try Kernel.Mmap.sync(addr: base, length: mappingLength, flags: flags)
+                let flags: Kernel.Mmap.SyncFlags = async ? .async : .sync
+                try Kernel.Mmap.sync(addr: base, length: mappingLength, flags: flags)
             #endif
         } catch {
             throw MMap.Error(from: error)

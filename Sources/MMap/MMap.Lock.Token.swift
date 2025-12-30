@@ -154,13 +154,13 @@ extension MMap.Lock.Token {
         let nanoseconds = UInt64(seconds) * 1_000_000_000 + UInt64(attoseconds) / 1_000_000_000
 
         #if os(Windows)
-        let milliseconds = nanoseconds / 1_000_000
-        Sleep(DWORD(min(milliseconds, UInt64(DWORD.max))))
+            let milliseconds = nanoseconds / 1_000_000
+            Sleep(DWORD(min(milliseconds, UInt64(DWORD.max))))
         #else
-        var ts = timespec()
-        ts.tv_sec = Int(nanoseconds / 1_000_000_000)
-        ts.tv_nsec = Int(nanoseconds % 1_000_000_000)
-        nanosleep(&ts, nil)
+            var ts = timespec()
+            ts.tv_sec = Int(nanoseconds / 1_000_000_000)
+            ts.tv_nsec = Int(nanoseconds % 1_000_000_000)
+            nanosleep(&ts, nil)
         #endif
     }
 }

@@ -135,8 +135,8 @@ extension MMap.Error {
                 self = .invalidAlignment
             }
         #if os(Windows)
-        case .windows(let code, let operation):
-            self = Self.fromWindowsError(DWORD(code), operation: operation)
+            case .windows(let code, let operation):
+                self = Self.fromWindowsError(DWORD(code), operation: operation)
         #endif
         }
     }
@@ -145,54 +145,54 @@ extension MMap.Error {
 // MARK: - POSIX Error Translation
 
 #if !os(Windows)
-extension MMap.Error {
-    /// Maps POSIX errno to semantic error.
-    static func fromErrno(_ errno: Int32, operation: String) -> Self {
-        switch errno {
-        case EACCES, EPERM:
-            return .permissionDenied
-        case EINVAL:
-            return .invalidAlignment
-        case ENOMEM:
-            return .outOfMemory
-        case ENODEV:
-            return .unsupportedFileType
-        case EBADF:
-            return .invalidHandle
-        case ENXIO:
-            return .invalidRange
-        case EFBIG:
-            return .mappingSizeLimit
-        case ENOTSUP:
-            return .unsupported
-        default:
-            let message = String(cString: strerror(errno))
-            return .platform(code: errno, message: "\(operation): \(message)")
+    extension MMap.Error {
+        /// Maps POSIX errno to semantic error.
+        static func fromErrno(_ errno: Int32, operation: String) -> Self {
+            switch errno {
+            case EACCES, EPERM:
+                return .permissionDenied
+            case EINVAL:
+                return .invalidAlignment
+            case ENOMEM:
+                return .outOfMemory
+            case ENODEV:
+                return .unsupportedFileType
+            case EBADF:
+                return .invalidHandle
+            case ENXIO:
+                return .invalidRange
+            case EFBIG:
+                return .mappingSizeLimit
+            case ENOTSUP:
+                return .unsupported
+            default:
+                let message = String(cString: strerror(errno))
+                return .platform(code: errno, message: "\(operation): \(message)")
+            }
         }
     }
-}
 #endif
 
 // MARK: - Windows Error Translation
 
 #if os(Windows)
-extension MMap.Error {
-    /// Maps Windows error code to semantic error.
-    static func fromWindowsError(_ error: DWORD, operation: String) -> Self {
-        switch error {
-        case DWORD(ERROR_ACCESS_DENIED):
-            return .permissionDenied
-        case DWORD(ERROR_INVALID_PARAMETER):
-            return .invalidAlignment
-        case DWORD(ERROR_NOT_ENOUGH_MEMORY), DWORD(ERROR_OUTOFMEMORY):
-            return .outOfMemory
-        case DWORD(ERROR_INVALID_HANDLE):
-            return .invalidHandle
-        case DWORD(ERROR_FILE_INVALID):
-            return .unsupportedFileType
-        default:
-            return .platform(code: Int32(error), message: "\(operation): Windows error")
+    extension MMap.Error {
+        /// Maps Windows error code to semantic error.
+        static func fromWindowsError(_ error: DWORD, operation: String) -> Self {
+            switch error {
+            case DWORD(ERROR_ACCESS_DENIED):
+                return .permissionDenied
+            case DWORD(ERROR_INVALID_PARAMETER):
+                return .invalidAlignment
+            case DWORD(ERROR_NOT_ENOUGH_MEMORY), DWORD(ERROR_OUTOFMEMORY):
+                return .outOfMemory
+            case DWORD(ERROR_INVALID_HANDLE):
+                return .invalidHandle
+            case DWORD(ERROR_FILE_INVALID):
+                return .unsupportedFileType
+            default:
+                return .platform(code: Int32(error), message: "\(operation): Windows error")
+            }
         }
     }
-}
 #endif

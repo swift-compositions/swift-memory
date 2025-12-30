@@ -12,7 +12,7 @@
 internal import Kernel
 
 #if os(Windows)
-public import WinSDK
+    public import WinSDK
 #endif
 
 extension MMap {
@@ -81,8 +81,8 @@ extension MMap {
         public let safety: Safety
 
         #if os(Windows)
-        /// Windows file mapping handle (must be closed on unmap).
-        var mappingHandle: HANDLE?
+            /// Windows file mapping handle (must be closed on unmap).
+            var mappingHandle: HANDLE?
         #endif
 
         /// Lock token for `.coordinated` safety mode.
@@ -116,11 +116,11 @@ extension MMap {
             lockToken?.release()
 
             #if os(Windows)
-            if let handle = mappingHandle {
-                try? Kernel.Mmap.unmap(WindowsMapping(baseAddress: base, mappingHandle: handle))
-            }
+                if let handle = mappingHandle {
+                    try? Kernel.Mmap.unmap(WindowsMapping(baseAddress: base, mappingHandle: handle))
+                }
             #else
-            try? Kernel.Mmap.unmap(addr: base, length: mappingLength)
+                try? Kernel.Mmap.unmap(addr: base, length: mappingLength)
             #endif
         }
     }

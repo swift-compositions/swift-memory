@@ -9,8 +9,8 @@
 //
 // ===----------------------------------------------------------------------===//
 
-import Testing
 import MMap
+import Testing
 
 @Suite
 struct RegionTests {
@@ -271,7 +271,7 @@ struct ErrorTests {
             .invalidHandle,
             .unsupportedFileType,
             .alreadyUnmapped,
-            .platform(code: 42, message: "test error")
+            .platform(code: 42, message: "test error"),
         ]
 
         for error in errors {
