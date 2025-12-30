@@ -69,7 +69,10 @@ extension MMap {
         let userLength: Int
 
         /// The access mode for this mapping.
-        public let access: Access
+        ///
+        /// This property reflects the current protection. It may be changed
+        /// via `protect(_:)` after mapping.
+        public internal(set) var access: Access
 
         /// The sharing mode for this mapping.
         public let sharing: Sharing

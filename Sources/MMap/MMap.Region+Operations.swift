@@ -183,6 +183,41 @@ extension MMap.Region {
     }
 }
 
+// MARK: - Protection
+
+extension MMap.Region {
+    /// Changes the memory protection of the mapped region.
+    ///
+    /// This allows runtime modification of access permissions, for example:
+    /// - Making a region writable after initial read-only mapping
+    /// - Removing write access after initialization is complete
+    ///
+    /// - Parameter newAccess: The new access permissions.
+    /// - Throws: `MMap.Error` if protection change fails.
+    ///
+    /// - Note: The new access must be compatible with the original file
+    ///   descriptor's open mode. You cannot add write access to a region
+    ///   mapped from a read-only file descriptor.
+    public mutating func protect(_ newAccess: Access) throws(MMap.Error) {
+        try newAccess.validate()
+
+        guard let base = mappingBaseAddress else {
+            throw .alreadyUnmapped
+        }
+
+        do {
+            try Kernel.Mmap.protect(
+                addr: base,
+                length: mappingLength,
+                protection: newAccess.kernelProtection
+            )
+            access = newAccess
+        } catch {
+            throw MMap.Error(from: error)
+        }
+    }
+}
+
 // MARK: - Synchronization
 
 extension MMap.Region {
