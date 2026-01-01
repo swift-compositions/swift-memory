@@ -195,7 +195,7 @@ public import Kernel
                 userLen = length
             case .wholeFile:
                 var fileSize = LARGE_INTEGER()
-                guard GetFileSizeEx(fileHandle, &fileSize) != 0 else {
+                guard GetFileSizeEx(fileHandle.rawValue, &fileSize) else {
                     throw .fromWindowsError(GetLastError(), operation: "GetFileSizeEx")
                 }
                 userLen = Int(fileSize.QuadPart)
@@ -216,7 +216,7 @@ public import Kernel
             let mapping: Kernel.Mmap.WindowsMapping
             do {
                 mapping = try Kernel.Mmap.mapFile(
-                    handle: fileHandle,
+                    handle: fileHandle.rawValue,
                     offset: Int64(alignedOffset),
                     length: mappingLen,
                     protection: access.kernelProtection,

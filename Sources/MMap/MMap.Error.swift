@@ -120,16 +120,30 @@ extension MMap.Error {
     /// errors to portable semantic errors.
     init(from kernelError: Kernel.Mmap.Error) {
         switch kernelError {
-        #if !os(Windows)
         case .mapFailed(let errno):
+            #if os(Windows)
+            self = .platform(code: errno, message: "mmap failed")
+            #else
             self = Self.fromErrno(errno, operation: "mmap")
+            #endif
         case .unmapFailed(let errno):
+            #if os(Windows)
+            self = .platform(code: errno, message: "munmap failed")
+            #else
             self = Self.fromErrno(errno, operation: "munmap")
+            #endif
         case .syncFailed(let errno):
+            #if os(Windows)
+            self = .platform(code: errno, message: "msync failed")
+            #else
             self = Self.fromErrno(errno, operation: "msync")
+            #endif
         case .protectFailed(let errno):
+            #if os(Windows)
+            self = .platform(code: errno, message: "mprotect failed")
+            #else
             self = Self.fromErrno(errno, operation: "mprotect")
-        #endif
+            #endif
         case .invalidArgument(let msg):
             if msg.contains("length") {
                 self = .invalidRange
