@@ -65,7 +65,7 @@ public import Kernel
                 userLen = length
             case .wholeFile:
                 var statBuf = stat()
-                guard fstat(fileDescriptor, &statBuf) == 0 else {
+                guard fstat(fileDescriptor.rawValue, &statBuf) == 0 else {
                     throw .fromErrno(errno, operation: "fstat")
                 }
                 userLen = Int(statBuf.st_size)

@@ -120,6 +120,7 @@ extension MMap.Error {
     /// errors to portable semantic errors.
     init(from kernelError: Kernel.Mmap.Error) {
         switch kernelError {
+        #if !os(Windows)
         case .mapFailed(let errno):
             self = Self.fromErrno(errno, operation: "mmap")
         case .unmapFailed(let errno):
@@ -128,6 +129,7 @@ extension MMap.Error {
             self = Self.fromErrno(errno, operation: "msync")
         case .protectFailed(let errno):
             self = Self.fromErrno(errno, operation: "mprotect")
+        #endif
         case .invalidArgument(let msg):
             if msg.contains("length") {
                 self = .invalidRange
@@ -135,8 +137,8 @@ extension MMap.Error {
                 self = .invalidAlignment
             }
         #if os(Windows)
-            case .windows(let code, let operation):
-                self = Self.fromWindowsError(DWORD(code), operation: operation)
+        case .windows(let code, let operation):
+            self = Self.fromWindowsError(DWORD(code), operation: operation)
         #endif
         }
     }
