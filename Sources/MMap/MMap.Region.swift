@@ -117,7 +117,7 @@ extension MMap {
 
             #if os(Windows)
                 if let handle = mappingHandle {
-                    try? Kernel.Mmap.unmap(WindowsMapping(baseAddress: base, mappingHandle: handle))
+                    try? Kernel.Mmap.unmap(Kernel.Mmap.WindowsMapping(baseAddress: base, mappingHandle: handle))
                 }
             #else
                 try? Kernel.Mmap.unmap(addr: base, length: mappingLength)
