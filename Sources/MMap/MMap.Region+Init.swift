@@ -204,20 +204,7 @@ public import Kernel
 
             let effectiveSafety = safety ?? (access.allowsWrite ? .defaultForWrite : .defaultForRead)
 
-            let userLen: Int
-            switch range {
-            case .bytes(_, let length):
-                userLen = length
-            case .wholeFile:
-                var fileSize = LARGE_INTEGER()
-                guard GetFileSizeEx(fileHandle.rawValue, &fileSize) else {
-                    throw MMap.Error.fromWindowsError(GetLastError(), operation: "GetFileSizeEx")
-                }
-                userLen = Int(fileSize.QuadPart)
-                guard userLen > 0 else {
-                    throw MMap.Error.fileTooSmall
-                }
-            }
+            let userLen = try Self.computeUserLength(range: range, fileHandle: fileHandle)
 
             let requestedOffset = range.offset
             let granularity = Kernel.System.allocationGranularity
@@ -226,7 +213,59 @@ public import Kernel
             let pageSize = Kernel.System.pageSize
             let mappingLen = Kernel.System.alignUp(userLen + delta, to: pageSize)
 
-            // Phase 2: Map the file
+            // Phase 2: Acquire resources using helper that handles cleanup
+            let (mapping, lockToken) = try Self.acquireResources(
+                fileHandle: fileHandle,
+                alignedOffset: alignedOffset,
+                mappingLen: mappingLen,
+                access: access,
+                sharing: sharing,
+                effectiveSafety: effectiveSafety
+            )
+
+            // Phase 3: Initialize all stored properties (no throws after this point)
+            self.mappingBaseAddress = mapping.baseAddress
+            self.mappingLength = mappingLen
+            self.mappingHandle = mapping.mappingHandle
+            self.offsetDelta = delta
+            self.userLength = userLen
+            self.access = access
+            self.sharing = sharing
+            self.safety = effectiveSafety
+            self.lockToken = lockToken
+        }
+
+        /// Computes the user-visible length from the range.
+        private static func computeUserLength(
+            range: Range,
+            fileHandle: Kernel.Descriptor
+        ) throws -> Int {
+            switch range {
+            case .bytes(_, let length):
+                return length
+            case .wholeFile:
+                var fileSize = LARGE_INTEGER()
+                guard GetFileSizeEx(fileHandle.rawValue, &fileSize) else {
+                    throw MMap.Error.fromWindowsError(GetLastError(), operation: "GetFileSizeEx")
+                }
+                let size = Int(fileSize.QuadPart)
+                guard size > 0 else {
+                    throw MMap.Error.fileTooSmall
+                }
+                return size
+            }
+        }
+
+        /// Acquires mapping and lock resources, handling cleanup on failure.
+        private static func acquireResources(
+            fileHandle: Kernel.Descriptor,
+            alignedOffset: Int,
+            mappingLen: Int,
+            access: Access,
+            sharing: Sharing,
+            effectiveSafety: Safety
+        ) throws -> (Kernel.Mmap.WindowsMapping, MMap.Lock.Token?) {
+            // Map the file
             let mapping: Kernel.Mmap.WindowsMapping
             do {
                 mapping = try Kernel.Mmap.mapFile(
@@ -240,20 +279,16 @@ public import Kernel
                 throw MMap.Error(from: error)
             }
 
-            // Phase 3: Acquire lock if needed
-            let acquiredLockToken: MMap.Lock.Token?
+            // Acquire lock if needed
+            let lockToken: MMap.Lock.Token?
             if case .coordinated(let kind, let scope) = effectiveSafety {
-                let lockRange: Kernel.Lock.Range
-                switch scope {
-                case .file:
-                    lockRange = .file
-                case .mappedRange:
-                    let end = alignedOffset + mappingLen
-                    let roundedEnd = Kernel.System.alignUp(end, to: granularity)
-                    lockRange = .bytes(start: UInt64(alignedOffset), end: UInt64(roundedEnd))
-                }
+                let lockRange = computeLockRange(
+                    scope: scope,
+                    alignedOffset: alignedOffset,
+                    mappingLength: mappingLen
+                )
                 do {
-                    acquiredLockToken = try MMap.Lock.Token(
+                    lockToken = try MMap.Lock.Token(
                         descriptor: fileHandle,
                         range: lockRange,
                         kind: kind
@@ -263,19 +298,27 @@ public import Kernel
                     throw MMap.Error.lockFailed(error)
                 }
             } else {
-                acquiredLockToken = nil
+                lockToken = nil
             }
 
-            // Phase 4: Initialize all stored properties (no throws after this point)
-            self.mappingBaseAddress = mapping.baseAddress
-            self.mappingLength = mappingLen
-            self.mappingHandle = mapping.mappingHandle
-            self.offsetDelta = delta
-            self.userLength = userLen
-            self.access = access
-            self.sharing = sharing
-            self.safety = effectiveSafety
-            self.lockToken = acquiredLockToken
+            return (mapping, lockToken)
+        }
+
+        /// Computes the lock range based on scope.
+        private static func computeLockRange(
+            scope: Safety.Scope,
+            alignedOffset: Int,
+            mappingLength: Int
+        ) -> Kernel.Lock.Range {
+            switch scope {
+            case .file:
+                return .file
+            case .mappedRange:
+                let granularity = Kernel.System.allocationGranularity
+                let end = alignedOffset + mappingLength
+                let roundedEnd = Kernel.System.alignUp(end, to: granularity)
+                return .bytes(start: UInt64(alignedOffset), end: UInt64(roundedEnd))
+            }
         }
     }
 #endif
