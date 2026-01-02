@@ -223,7 +223,7 @@ public import Kernel
             let mappingLen = Kernel.System.alignUp(userLen + delta, to: pageSize)
 
             // Phase 2: Acquire resources using helper that handles cleanup
-            let (baseAddress, mappingHandle, lockToken) = try Self.acquireResources(
+            let (mapping, lockToken) = try Self.acquireResources(
                 fileHandle: fileHandle,
                 alignedOffset: alignedOffset,
                 mappingLen: mappingLen,
@@ -233,9 +233,9 @@ public import Kernel
             )
 
             // Phase 3: Initialize all stored properties (no throws after this point)
-            self.mappingBaseAddress = baseAddress
+            self.mappingBaseAddress = mapping.baseAddress
             self.mappingLength = mappingLen
-            self.mappingHandle = mappingHandle
+            self.mappingHandle = mapping.mappingHandle
             self.offsetDelta = delta
             self.userLength = userLen
             self.access = access
@@ -252,7 +252,7 @@ public import Kernel
             access: Access,
             sharing: Sharing,
             effectiveSafety: Safety
-        ) throws(MMap.Error) -> (UnsafeMutableRawPointer, HANDLE, MMap.Lock.Token?) {
+        ) throws(MMap.Error) -> (Kernel.Mmap.WindowsMapping, MMap.Lock.Token?) {
             // Map the file
             let mapping: Kernel.Mmap.WindowsMapping
             do {
@@ -289,7 +289,7 @@ public import Kernel
                 lockToken = nil
             }
 
-            return (mapping.baseAddress, mapping.mappingHandle, lockToken)
+            return (mapping, lockToken)
         }
 
         /// Computes the lock range based on scope.
