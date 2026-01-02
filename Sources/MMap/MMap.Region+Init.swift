@@ -53,12 +53,11 @@ public import Kernel
             sharing: Sharing = .shared,
             safety: Safety? = nil
         ) throws(MMap.Error) {
-            // Validate access
+            // Phase 1: All validation and computation (no resources acquired)
             try access.validate()
 
             let effectiveSafety = safety ?? (access.allowsWrite ? .defaultForWrite : .defaultForRead)
 
-            // Resolve range length (query file size for .wholeFile)
             let userLen: Int
             switch range {
             case .bytes(_, let length):
@@ -74,7 +73,6 @@ public import Kernel
                 }
             }
 
-            // Calculate alignment
             let requestedOffset = range.offset
             let granularity = Kernel.System.allocationGranularity
             let alignedOffset = Kernel.System.alignDown(requestedOffset, to: granularity)
@@ -82,10 +80,37 @@ public import Kernel
             let pageSize = Kernel.System.pageSize
             let mappingLen = Kernel.System.alignUp(userLen + delta, to: pageSize)
 
-            // Perform all throwing work before initializing any stored properties
-            // (required for ~Copyable types)
+            // Phase 2: Acquire resources using helper that handles cleanup
+            let (baseAddress, lockToken) = try Self.acquireResources(
+                fileDescriptor: fileDescriptor,
+                alignedOffset: alignedOffset,
+                mappingLen: mappingLen,
+                access: access,
+                sharing: sharing,
+                effectiveSafety: effectiveSafety
+            )
 
-            // 1. Map the file
+            // Phase 3: Initialize all stored properties (no throws after this point)
+            self.mappingBaseAddress = baseAddress
+            self.mappingLength = mappingLen
+            self.offsetDelta = delta
+            self.userLength = userLen
+            self.access = access
+            self.sharing = sharing
+            self.safety = effectiveSafety
+            self.lockToken = lockToken
+        }
+
+        /// Acquires mapping and lock resources, handling cleanup on failure.
+        private static func acquireResources(
+            fileDescriptor: Kernel.Descriptor,
+            alignedOffset: Int,
+            mappingLen: Int,
+            access: Access,
+            sharing: Sharing,
+            effectiveSafety: Safety
+        ) throws(MMap.Error) -> (UnsafeMutableRawPointer, MMap.Lock.Token?) {
+            // Map the file
             let baseAddress: UnsafeMutableRawPointer
             do {
                 baseAddress = try Kernel.Mmap.map(
@@ -99,38 +124,29 @@ public import Kernel
                 throw MMap.Error(from: error)
             }
 
-            // 2. Acquire lock if needed
-            let acquiredLockToken: MMap.Lock.Token?
+            // Acquire lock if needed
+            let lockToken: MMap.Lock.Token?
             if case .coordinated(let kind, let scope) = effectiveSafety {
-                let lockRange = Self.computeLockRange(
+                let lockRange = computeLockRange(
                     scope: scope,
                     alignedOffset: alignedOffset,
                     mappingLength: mappingLen
                 )
                 do {
-                    acquiredLockToken = try MMap.Lock.Token(
+                    lockToken = try MMap.Lock.Token(
                         descriptor: fileDescriptor,
                         range: lockRange,
                         kind: kind
                     )
                 } catch {
-                    // Unmap on lock failure (before we've initialized self)
                     try? Kernel.Mmap.unmap(addr: baseAddress, length: mappingLen)
                     throw .lockFailed(error)
                 }
             } else {
-                acquiredLockToken = nil
+                lockToken = nil
             }
 
-            // Now initialize all stored properties at once
-            self.mappingBaseAddress = baseAddress
-            self.mappingLength = mappingLen
-            self.offsetDelta = delta
-            self.userLength = userLen
-            self.access = access
-            self.sharing = sharing
-            self.safety = effectiveSafety
-            self.lockToken = acquiredLockToken
+            return (baseAddress, lockToken)
         }
 
         /// Computes the lock range based on scope.
@@ -183,12 +199,11 @@ public import Kernel
             sharing: Sharing = .shared,
             safety: Safety? = nil
         ) throws(MMap.Error) {
-            // Validate access
+            // Phase 1: All validation and computation (no resources acquired)
             try access.validate()
 
             let effectiveSafety = safety ?? (access.allowsWrite ? .defaultForWrite : .defaultForRead)
 
-            // Resolve range length (query file size for .wholeFile)
             let userLen: Int
             switch range {
             case .bytes(_, let length):
@@ -204,7 +219,6 @@ public import Kernel
                 }
             }
 
-            // Calculate alignment (Windows uses 64KB granularity)
             let requestedOffset = range.offset
             let granularity = Kernel.System.allocationGranularity
             let alignedOffset = Kernel.System.alignDown(requestedOffset, to: granularity)
@@ -212,7 +226,38 @@ public import Kernel
             let pageSize = Kernel.System.pageSize
             let mappingLen = Kernel.System.alignUp(userLen + delta, to: pageSize)
 
-            // 1. Map the file
+            // Phase 2: Acquire resources using helper that handles cleanup
+            let (mapping, lockToken) = try Self.acquireResources(
+                fileHandle: fileHandle,
+                alignedOffset: alignedOffset,
+                mappingLen: mappingLen,
+                access: access,
+                sharing: sharing,
+                effectiveSafety: effectiveSafety
+            )
+
+            // Phase 3: Initialize all stored properties (no throws after this point)
+            self.mappingBaseAddress = mapping.baseAddress
+            self.mappingLength = mappingLen
+            self.mappingHandle = mapping.mappingHandle
+            self.offsetDelta = delta
+            self.userLength = userLen
+            self.access = access
+            self.sharing = sharing
+            self.safety = effectiveSafety
+            self.lockToken = lockToken
+        }
+
+        /// Acquires mapping and lock resources, handling cleanup on failure.
+        private static func acquireResources(
+            fileHandle: Kernel.Descriptor,
+            alignedOffset: Int,
+            mappingLen: Int,
+            access: Access,
+            sharing: Sharing,
+            effectiveSafety: Safety
+        ) throws(MMap.Error) -> (Kernel.Mmap.WindowsMapping, MMap.Lock.Token?) {
+            // Map the file
             let mapping: Kernel.Mmap.WindowsMapping
             do {
                 mapping = try Kernel.Mmap.mapFile(
@@ -226,39 +271,29 @@ public import Kernel
                 throw MMap.Error(from: error)
             }
 
-            // 2. Acquire lock if needed
-            let acquiredLockToken: MMap.Lock.Token?
+            // Acquire lock if needed
+            let lockToken: MMap.Lock.Token?
             if case .coordinated(let kind, let scope) = effectiveSafety {
-                let lockRange = Self.computeLockRange(
+                let lockRange = computeLockRange(
                     scope: scope,
                     alignedOffset: alignedOffset,
                     mappingLength: mappingLen
                 )
                 do {
-                    acquiredLockToken = try MMap.Lock.Token(
+                    lockToken = try MMap.Lock.Token(
                         descriptor: fileHandle,
                         range: lockRange,
                         kind: kind
                     )
                 } catch {
-                    // Unmap on lock failure
                     try? Kernel.Mmap.unmap(mapping)
                     throw .lockFailed(error)
                 }
             } else {
-                acquiredLockToken = nil
+                lockToken = nil
             }
 
-            // Initialize all stored properties
-            self.mappingBaseAddress = mapping.baseAddress
-            self.mappingLength = mappingLen
-            self.mappingHandle = mapping.mappingHandle
-            self.offsetDelta = delta
-            self.userLength = userLen
-            self.access = access
-            self.sharing = sharing
-            self.safety = effectiveSafety
-            self.lockToken = acquiredLockToken
+            return (mapping, lockToken)
         }
 
         /// Computes the lock range based on scope.
