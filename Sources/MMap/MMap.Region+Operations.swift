@@ -31,12 +31,13 @@ extension MMap.Region {
             if let handle = mappingHandle {
                 try? Kernel.Mmap.unmap(Kernel.Mmap.WindowsMapping(baseAddress: base, mappingHandle: handle))
             }
+            mappingHandle = nil
         #else
             try? Kernel.Mmap.unmap(addr: base, length: mappingLength)
         #endif
 
-        // Mark as unmapped (for deinit safety)
-        // Note: In a consuming function, we're destroying self anyway
+        // Mark as unmapped so deinit becomes a no-op
+        mappingBaseAddress = nil
     }
 }
 
