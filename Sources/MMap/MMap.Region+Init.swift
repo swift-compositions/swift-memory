@@ -239,7 +239,7 @@ public import Kernel
             access: Access,
             sharing: Sharing,
             safety: Safety?
-        ) throws -> Prepared {
+        ) throws(MMap.Error) -> Prepared {
             // Validate access
             try access.validate()
 
