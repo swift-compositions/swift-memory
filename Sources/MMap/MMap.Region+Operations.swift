@@ -100,7 +100,7 @@ extension MMap.Region {
         public consuming func remap(
             fileHandle: Kernel.Descriptor,
             range: Range
-        ) throws(MMap.Error) -> Self {
+        ) throws -> Self {
             // Capture values before consuming self
             let capturedAccess = access
             let capturedSharing = sharing
