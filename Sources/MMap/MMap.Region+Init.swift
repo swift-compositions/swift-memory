@@ -179,6 +179,17 @@ public import Kernel
 
 #if os(Windows)
     extension MMap.Region {
+        /// Holds prepared file mapping resources before struct initialization.
+        /// Using a struct instead of a tuple works around a Swift SIL bug on Windows.
+        private struct Prepared {
+            let baseAddress: UnsafeMutableRawPointer
+            let mappingLen: Int
+            let mappingHandle: HANDLE
+            let delta: Int
+            let userLen: Int
+            let effectiveSafety: Safety
+            let lockToken: MMap.Lock.Token?
+        }
         /// Creates a memory-mapped region from a Windows file handle.
         ///
         /// - Parameters:
@@ -228,15 +239,7 @@ public import Kernel
             access: Access,
             sharing: Sharing,
             safety: Safety?
-        ) throws(MMap.Error) -> (
-            baseAddress: UnsafeMutableRawPointer,
-            mappingLen: Int,
-            mappingHandle: HANDLE,
-            delta: Int,
-            userLen: Int,
-            effectiveSafety: Safety,
-            lockToken: MMap.Lock.Token?
-        ) {
+        ) throws(MMap.Error) -> Prepared {
             // Validate access
             try access.validate()
 
@@ -302,7 +305,7 @@ public import Kernel
                 lockToken = nil
             }
 
-            return (
+            return Prepared(
                 baseAddress: mapping.baseAddress,
                 mappingLen: mappingLen,
                 mappingHandle: mapping.mappingHandle,

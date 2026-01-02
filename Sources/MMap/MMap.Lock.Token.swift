@@ -9,7 +9,7 @@
 //
 // ===----------------------------------------------------------------------===//
 
-public import Kernel
+import Kernel
 
 extension MMap {
     /// File locking namespace for memory mapping.
