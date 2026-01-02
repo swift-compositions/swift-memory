@@ -13,6 +13,14 @@ public import Kernel
 
 #if os(Windows)
     internal import WinSDK
+#else
+    #if canImport(Darwin)
+        internal import Darwin
+    #elseif canImport(Glibc)
+        internal import Glibc
+    #elseif canImport(Musl)
+        internal import Musl
+    #endif
 #endif
 
 extension MMap {

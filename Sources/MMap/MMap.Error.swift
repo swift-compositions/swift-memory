@@ -64,7 +64,7 @@ extension MMap {
         case lockFailed(Kernel.Lock.Error)
 
         /// Failed to get file metadata (stat).
-        case statFailed(Kernel.Error)
+        case statFailed(Kernel.Stat.Error)
 
         /// Platform-specific error with error code.
         case platform(code: Int32, message: String)
