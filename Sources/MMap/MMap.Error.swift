@@ -11,13 +11,7 @@
 
 public import Kernel
 
-#if canImport(Darwin)
-    internal import Darwin
-#elseif canImport(Glibc)
-    internal import Glibc
-#elseif canImport(Musl)
-    internal import Musl
-#elseif os(Windows)
+#if os(Windows)
     internal import WinSDK
 #endif
 
@@ -69,6 +63,9 @@ extension MMap {
         /// lock cannot be acquired (e.g., another process holds an exclusive lock).
         case lockFailed(Kernel.Lock.Error)
 
+        /// Failed to get file metadata (stat).
+        case statFailed(Kernel.Error)
+
         /// Platform-specific error with error code.
         case platform(code: Int32, message: String)
     }
@@ -105,6 +102,8 @@ extension MMap.Error: CustomStringConvertible {
             return "Mapping already unmapped"
         case .lockFailed(let lockError):
             return "Lock acquisition failed: \(lockError.description)"
+        case .statFailed(let error):
+            return "Failed to get file metadata: \(error)"
         case .platform(let code, let message):
             return "Platform error \(code): \(message)"
         }
@@ -164,26 +163,26 @@ extension MMap.Error {
     extension MMap.Error {
         /// Maps POSIX errno to semantic error.
         static func fromErrno(_ errno: Int32, operation: String) -> Self {
+            // Note: errno constants are provided by Kernel's public imports
             switch errno {
-            case EACCES, EPERM:
+            case 13, 1:  // EACCES, EPERM
                 return .permissionDenied
-            case EINVAL:
+            case 22:  // EINVAL
                 return .invalidAlignment
-            case ENOMEM:
+            case 12:  // ENOMEM
                 return .outOfMemory
-            case ENODEV:
+            case 19:  // ENODEV
                 return .unsupportedFileType
-            case EBADF:
+            case 9:  // EBADF
                 return .invalidHandle
-            case ENXIO:
+            case 6:  // ENXIO
                 return .invalidRange
-            case EFBIG:
+            case 27:  // EFBIG
                 return .mappingSizeLimit
-            case ENOTSUP:
+            case 45, 95:  // ENOTSUP (Darwin: 45, Linux: 95)
                 return .unsupported
             default:
-                let message = String(cString: strerror(errno))
-                return .platform(code: errno, message: "\(operation): \(message)")
+                return .platform(code: errno, message: operation)
             }
         }
     }

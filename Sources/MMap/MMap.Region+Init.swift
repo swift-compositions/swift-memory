@@ -11,13 +11,7 @@
 
 public import Kernel
 
-#if canImport(Darwin)
-    internal import Darwin
-#elseif canImport(Glibc)
-    internal import Glibc
-#elseif canImport(Musl)
-    internal import Musl
-#elseif os(Windows)
+#if os(Windows)
     internal import WinSDK
 #endif
 
@@ -63,11 +57,13 @@ public import Kernel
             case .bytes(_, let length):
                 userLen = length
             case .wholeFile:
-                var statBuf = stat()
-                guard fstat(fileDescriptor.rawValue, &statBuf) == 0 else {
-                    throw .fromErrno(errno, operation: "fstat")
+                let fileStat: Kernel.Stat
+                do {
+                    fileStat = try Kernel.File.stat(fileDescriptor)
+                } catch {
+                    throw .statFailed(error)
                 }
-                userLen = Int(statBuf.st_size)
+                userLen = Int(fileStat.size)
                 guard userLen > 0 else {
                     throw .fileTooSmall
                 }

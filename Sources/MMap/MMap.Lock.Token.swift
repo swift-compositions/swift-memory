@@ -9,15 +9,9 @@
 //
 // ===----------------------------------------------------------------------===//
 
-internal import Kernel
+public import Kernel
 
-#if canImport(Darwin)
-    internal import Darwin
-#elseif canImport(Glibc)
-    internal import Glibc
-#elseif canImport(Musl)
-    internal import Musl
-#elseif os(Windows)
+#if os(Windows)
     internal import WinSDK
 #endif
 
