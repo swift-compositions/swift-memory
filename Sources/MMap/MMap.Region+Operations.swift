@@ -97,13 +97,10 @@ extension MMap.Region {
         ///   - range: The new range to map.
         /// - Returns: A new `Region` with the specified range.
         /// - Throws: `MMap.Error` if remapping fails.
-        ///
-        /// - Note: Uses regular `throws` instead of typed throws to work around
-        ///   Swift compiler SIL verification bugs with typed throws + ~Copyable on Windows.
         public consuming func remap(
             fileHandle: Kernel.Descriptor,
             range: Range
-        ) throws -> Self {
+        ) throws(MMap.Error) -> Self {
             // Capture values before consuming self
             let capturedAccess = access
             let capturedSharing = sharing
