@@ -17,7 +17,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/coenttb/swift-kernel.git", from: "0.2.5"),
+        .package(url: "https://github.com/coenttb/swift-kernel.git", from: "0.3.0"),
     ],
     targets: [
         .target(

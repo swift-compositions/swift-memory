@@ -380,3 +380,69 @@ extension MMap.Region {
         }
     }
 #endif
+
+// MARK: - Special Offset Mapping (Linux)
+
+#if os(Linux)
+    extension MMap.Region {
+        /// Creates a memory-mapped region from a file descriptor with a specific mmap offset.
+        ///
+        /// This is used for special mappings like io_uring ring buffers where the
+        /// offset is not a file offset but a magic value that selects a specific region.
+        ///
+        /// ## io_uring Example
+        ///
+        /// ```swift
+        /// // Map the io_uring SQ ring
+        /// let sqRing = try MMap.Region(
+        ///     fileDescriptor: ringFd,
+        ///     mmapOffset: Kernel.IOUring.MmapOffset.sqRing,
+        ///     length: sqRingSize,
+        ///     access: [.read, .write],
+        ///     sharing: .shared
+        /// )
+        /// ```
+        ///
+        /// - Parameters:
+        ///   - fileDescriptor: The file descriptor to map (e.g., io_uring fd).
+        ///   - mmapOffset: The mmap offset (e.g., `Kernel.IOUring.MmapOffset.sqRing`).
+        ///   - length: Number of bytes to map.
+        ///   - access: The access mode (default: `[.read, .write]`).
+        ///   - sharing: The sharing mode (default: `.shared`).
+        /// - Throws: `MMap.Error` if mapping fails.
+        public init(
+            fileDescriptor: Kernel.Descriptor,
+            mmapOffset: Int64,
+            length: Int,
+            access: Access = [.read, .write],
+            sharing: Sharing = .shared
+        ) throws(MMap.Error) {
+            try access.validate()
+
+            let pageSize = Kernel.System.pageSize
+            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
+
+            let baseAddress: UnsafeMutableRawPointer
+            do {
+                baseAddress = try Kernel.Mmap.map(
+                    length: mappingLen,
+                    protection: access.kernelProtection,
+                    flags: sharing.kernelFlags,
+                    fd: fileDescriptor,
+                    offset: mmapOffset
+                )
+            } catch {
+                throw MMap.Error(from: error)
+            }
+
+            self.mappingBaseAddress = baseAddress
+            self.mappingLength = mappingLen
+            self.offsetDelta = 0
+            self.userLength = length
+            self.access = access
+            self.sharing = sharing
+            self.safety = .unchecked
+            self.lockToken = nil
+        }
+    }
+#endif
