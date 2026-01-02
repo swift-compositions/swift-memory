@@ -181,40 +181,24 @@ public import Kernel
     extension MMap.Region {
         /// Creates a memory-mapped region from a Windows file handle.
         ///
+        /// This is a static factory method that works around Swift compiler bugs
+        /// on Windows where throwing inits on ~Copyable structs with Optional<Class>
+        /// fields generate incorrect SIL.
+        ///
         /// - Parameters:
         ///   - fileHandle: The Windows file handle to map.
         ///   - range: The range to map (offset will be aligned to allocation granularity).
         ///   - access: The access mode (default: `.read`).
         ///   - sharing: The sharing mode (default: `.shared`).
         ///   - safety: The safety mode (defaults based on access).
+        /// - Returns: A new `Region` mapping the file.
         /// - Throws: `MMap.Error` if mapping fails.
-        public init(
+        public static func open(
             fileHandle: Kernel.Descriptor,
             range: Range,
             access: Access = .read,
             sharing: Sharing = .shared,
             safety: Safety? = nil
-        ) throws(MMap.Error) {
-            // Delegate to static factory that returns a fully-constructed Region.
-            // This works around a Swift SIL verification bug on Windows where
-            // typed throws + ~Copyable + Optional<Class> field causes incorrect
-            // destroy_addr instructions in error paths.
-            self = try Self._create(
-                fileHandle: fileHandle,
-                range: range,
-                access: access,
-                sharing: sharing,
-                safety: safety
-            )
-        }
-
-        /// Static factory that creates a Region by calling the non-throwing memberwise init.
-        private static func _create(
-            fileHandle: Kernel.Descriptor,
-            range: Range,
-            access: Access,
-            sharing: Sharing,
-            safety: Safety?
         ) throws(MMap.Error) -> Self {
             // Validate access
             try access.validate()

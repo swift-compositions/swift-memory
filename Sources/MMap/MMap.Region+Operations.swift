@@ -108,7 +108,7 @@ extension MMap.Region {
 
             self.unmap()
 
-            return try Self(
+            return try Self.open(
                 fileHandle: fileHandle,
                 range: range,
                 access: capturedAccess,
