@@ -297,46 +297,29 @@ public import Kernel
     }
 #endif
 
-// MARK: - Anonymous Mapping
+// MARK: - Anonymous Mapping (POSIX)
 
-extension MMap.Region {
-    /// Creates an anonymous memory mapping (not backed by a file).
-    ///
-    /// Anonymous mappings are backed by:
-    /// - POSIX: Swap/memory only
-    /// - Windows: The system pagefile
-    ///
-    /// - Parameters:
-    ///   - length: The number of bytes to map.
-    ///   - access: The access mode (default: `[.read, .write]`).
-    ///   - sharing: The sharing mode (default: `.private`).
-    /// - Throws: `MMap.Error` if mapping fails.
-    public init(
-        anonymousLength length: Int,
-        access: Access = [.read, .write],
-        sharing: Sharing = .private
-    ) throws(MMap.Error) {
-        // Validate access
-        try access.validate()
+#if !os(Windows)
+    extension MMap.Region {
+        /// Creates an anonymous memory mapping (not backed by a file).
+        ///
+        /// Anonymous mappings are backed by swap/memory only.
+        ///
+        /// - Parameters:
+        ///   - length: The number of bytes to map.
+        ///   - access: The access mode (default: `[.read, .write]`).
+        ///   - sharing: The sharing mode (default: `.private`).
+        /// - Throws: `MMap.Error` if mapping fails.
+        public init(
+            anonymousLength length: Int,
+            access: Access = [.read, .write],
+            sharing: Sharing = .private
+        ) throws(MMap.Error) {
+            try access.validate()
 
-        let pageSize = Kernel.System.pageSize
-        let mappingLen = Kernel.System.alignUp(length, to: pageSize)
+            let pageSize = Kernel.System.pageSize
+            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
 
-        #if os(Windows)
-            let mapping: Kernel.Mmap.WindowsMapping
-            do {
-                mapping = try Kernel.Mmap.mapAnonymous(
-                    length: mappingLen,
-                    protection: access.kernelProtection
-                )
-            } catch {
-                throw MMap.Error(from: error)
-            }
-
-            self.mappingBaseAddress = mapping.baseAddress
-            self.mappingLength = mappingLen
-            self.mappingHandle = mapping.mappingHandle
-        #else
             let baseAddress: UnsafeMutableRawPointer
             do {
                 baseAddress = try Kernel.Mmap.mapAnonymous(
@@ -350,13 +333,62 @@ extension MMap.Region {
 
             self.mappingBaseAddress = baseAddress
             self.mappingLength = mappingLen
-        #endif
-
-        self.offsetDelta = 0
-        self.userLength = length
-        self.access = access
-        self.sharing = sharing
-        self.safety = .unchecked  // Anonymous mappings don't need lock coordination
-        self.lockToken = nil
+            self.offsetDelta = 0
+            self.userLength = length
+            self.access = access
+            self.sharing = sharing
+            self.safety = .unchecked
+            self.lockToken = nil
+        }
     }
-}
+#endif
+
+// MARK: - Anonymous Mapping (Windows)
+
+#if os(Windows)
+    extension MMap.Region {
+        /// Creates an anonymous memory mapping (backed by the system pagefile).
+        ///
+        /// This is a static factory method that works around Swift compiler bugs
+        /// on Windows where throwing inits on ~Copyable structs generate incorrect SIL.
+        ///
+        /// - Parameters:
+        ///   - length: The number of bytes to map.
+        ///   - access: The access mode (default: `[.read, .write]`).
+        ///   - sharing: The sharing mode (default: `.private`).
+        /// - Returns: A new anonymous `Region`.
+        /// - Throws: `MMap.Error` if mapping fails.
+        public static func anonymous(
+            length: Int,
+            access: Access = [.read, .write],
+            sharing: Sharing = .private
+        ) throws(MMap.Error) -> Self {
+            try access.validate()
+
+            let pageSize = Kernel.System.pageSize
+            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
+
+            let mapping: Kernel.Mmap.WindowsMapping
+            do {
+                mapping = try Kernel.Mmap.mapAnonymous(
+                    length: mappingLen,
+                    protection: access.kernelProtection
+                )
+            } catch {
+                throw MMap.Error(from: error)
+            }
+
+            return Self(
+                mappingBaseAddress: mapping.baseAddress,
+                mappingLength: mappingLen,
+                mappingHandle: mapping.mappingHandle,
+                offsetDelta: 0,
+                userLength: length,
+                access: access,
+                sharing: sharing,
+                safety: .unchecked,
+                lockToken: nil
+            )
+        }
+    }
+#endif
