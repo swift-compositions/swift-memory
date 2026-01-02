@@ -198,13 +198,26 @@ public import Kernel
             access: Access = .read,
             sharing: Sharing = .shared,
             safety: Safety? = nil
-        ) throws {
+        ) throws(MMap.Error) {
             // Phase 1: All validation and computation (no resources acquired)
             try access.validate()
 
             let effectiveSafety = safety ?? (access.allowsWrite ? .defaultForWrite : .defaultForRead)
 
-            let userLen = try Self.computeUserLength(range: range, fileHandle: fileHandle)
+            let userLen: Int
+            switch range {
+            case .bytes(_, let length):
+                userLen = length
+            case .wholeFile:
+                var fileSize = LARGE_INTEGER()
+                guard GetFileSizeEx(fileHandle.rawValue, &fileSize) else {
+                    throw .fromWindowsError(GetLastError(), operation: "GetFileSizeEx")
+                }
+                userLen = Int(fileSize.QuadPart)
+                guard userLen > 0 else {
+                    throw .fileTooSmall
+                }
+            }
 
             let requestedOffset = range.offset
             let granularity = Kernel.System.allocationGranularity
@@ -235,27 +248,6 @@ public import Kernel
             self.lockToken = lockToken
         }
 
-        /// Computes the user-visible length from the range.
-        private static func computeUserLength(
-            range: Range,
-            fileHandle: Kernel.Descriptor
-        ) throws -> Int {
-            switch range {
-            case .bytes(_, let length):
-                return length
-            case .wholeFile:
-                var fileSize = LARGE_INTEGER()
-                guard GetFileSizeEx(fileHandle.rawValue, &fileSize) else {
-                    throw MMap.Error.fromWindowsError(GetLastError(), operation: "GetFileSizeEx")
-                }
-                let size = Int(fileSize.QuadPart)
-                guard size > 0 else {
-                    throw MMap.Error.fileTooSmall
-                }
-                return size
-            }
-        }
-
         /// Acquires mapping and lock resources, handling cleanup on failure.
         private static func acquireResources(
             fileHandle: Kernel.Descriptor,
@@ -264,7 +256,7 @@ public import Kernel
             access: Access,
             sharing: Sharing,
             effectiveSafety: Safety
-        ) throws -> (Kernel.Mmap.WindowsMapping, MMap.Lock.Token?) {
+        ) throws(MMap.Error) -> (Kernel.Mmap.WindowsMapping, MMap.Lock.Token?) {
             // Map the file
             let mapping: Kernel.Mmap.WindowsMapping
             do {
@@ -295,7 +287,7 @@ public import Kernel
                     )
                 } catch {
                     try? Kernel.Mmap.unmap(mapping)
-                    throw MMap.Error.lockFailed(error)
+                    throw .lockFailed(error)
                 }
             } else {
                 lockToken = nil
