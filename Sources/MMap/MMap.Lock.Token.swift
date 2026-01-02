@@ -11,18 +11,6 @@
 
 public import Kernel
 
-#if os(Windows)
-    internal import WinSDK
-#else
-    #if canImport(Darwin)
-        internal import Darwin
-    #elseif canImport(Glibc)
-        internal import Glibc
-    #elseif canImport(Musl)
-        internal import Musl
-    #endif
-#endif
-
 extension MMap {
     /// File locking namespace for memory mapping.
     public enum Lock {}
@@ -150,19 +138,10 @@ extension MMap.Lock.Token {
         }
     }
 
-    /// Platform-specific sleep without Foundation dependency.
+    /// Sleep using Kernel.System helper.
     private static func sleep(_ duration: Duration) {
         let (seconds, attoseconds) = duration.components
         let nanoseconds = UInt64(seconds) * 1_000_000_000 + UInt64(attoseconds) / 1_000_000_000
-
-        #if os(Windows)
-            let milliseconds = nanoseconds / 1_000_000
-            Sleep(DWORD(min(milliseconds, UInt64(DWORD.max))))
-        #else
-            var ts = timespec()
-            ts.tv_sec = Int(nanoseconds / 1_000_000_000)
-            ts.tv_nsec = Int(nanoseconds % 1_000_000_000)
-            nanosleep(&ts, nil)
-        #endif
+        Kernel.System.sleep(nanoseconds: nanoseconds)
     }
 }

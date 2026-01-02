@@ -121,27 +121,27 @@ extension MMap.Error {
         switch kernelError {
         case .mapFailed(let errno):
             #if os(Windows)
-            self = .platform(code: errno, message: "mmap failed")
+                self = .platform(code: errno, message: "mmap failed")
             #else
-            self = Self.fromErrno(errno, operation: "mmap")
+                self = Self.fromErrno(errno, operation: "mmap")
             #endif
         case .unmapFailed(let errno):
             #if os(Windows)
-            self = .platform(code: errno, message: "munmap failed")
+                self = .platform(code: errno, message: "munmap failed")
             #else
-            self = Self.fromErrno(errno, operation: "munmap")
+                self = Self.fromErrno(errno, operation: "munmap")
             #endif
         case .syncFailed(let errno):
             #if os(Windows)
-            self = .platform(code: errno, message: "msync failed")
+                self = .platform(code: errno, message: "msync failed")
             #else
-            self = Self.fromErrno(errno, operation: "msync")
+                self = Self.fromErrno(errno, operation: "msync")
             #endif
         case .protectFailed(let errno):
             #if os(Windows)
-            self = .platform(code: errno, message: "mprotect failed")
+                self = .platform(code: errno, message: "mprotect failed")
             #else
-            self = Self.fromErrno(errno, operation: "mprotect")
+                self = Self.fromErrno(errno, operation: "mprotect")
             #endif
         case .invalidArgument(let msg):
             if msg.contains("length") {
@@ -150,8 +150,8 @@ extension MMap.Error {
                 self = .invalidAlignment
             }
         #if os(Windows)
-        case .windows(let code, let operation):
-            self = Self.fromWindowsError(DWORD(code), operation: operation)
+            case .windows(let code, let operation):
+                self = Self.fromWindowsError(DWORD(code), operation: operation)
         #endif
         }
     }

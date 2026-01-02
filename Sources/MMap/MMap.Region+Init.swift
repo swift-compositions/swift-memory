@@ -188,6 +188,9 @@ public import Kernel
         ///   - sharing: The sharing mode (default: `.shared`).
         ///   - safety: The safety mode (defaults based on access).
         /// - Throws: `MMap.Error` if mapping fails.
+        ///
+        /// - Note: Implementation uses a static helper to work around Swift compiler
+        ///   SIL verification issues with typed throws and ~Copyable on Windows.
         public init(
             fileHandle: Kernel.Descriptor,
             range: Range,
@@ -195,11 +198,51 @@ public import Kernel
             sharing: Sharing = .shared,
             safety: Safety? = nil
         ) throws(MMap.Error) {
-            // Phase 1: All validation and computation (no resources acquired)
+            // All throwing code must complete before any property assignment.
+            // This works around a Swift SIL bug on Windows with typed throws + ~Copyable.
+            let result = try Self._prepareFileMapping(
+                fileHandle: fileHandle,
+                range: range,
+                access: access,
+                sharing: sharing,
+                safety: safety
+            )
+
+            // Initialize all stored properties at once (no throws after this point)
+            self.mappingBaseAddress = result.baseAddress
+            self.mappingLength = result.mappingLen
+            self.mappingHandle = result.mappingHandle
+            self.offsetDelta = result.delta
+            self.userLength = result.userLen
+            self.access = access
+            self.sharing = sharing
+            self.safety = result.effectiveSafety
+            self.lockToken = result.lockToken
+        }
+
+        /// Prepares all values needed for file-backed mapping initialization.
+        /// This static helper isolates all throwing code from property assignment.
+        private static func _prepareFileMapping(
+            fileHandle: Kernel.Descriptor,
+            range: Range,
+            access: Access,
+            sharing: Sharing,
+            safety: Safety?
+        ) throws(MMap.Error) -> (
+            baseAddress: UnsafeMutableRawPointer,
+            mappingLen: Int,
+            mappingHandle: HANDLE,
+            delta: Int,
+            userLen: Int,
+            effectiveSafety: Safety,
+            lockToken: MMap.Lock.Token?
+        ) {
+            // Validate access
             try access.validate()
 
             let effectiveSafety = safety ?? (access.allowsWrite ? .defaultForWrite : .defaultForRead)
 
+            // Compute user length
             let userLen: Int
             switch range {
             case .bytes(_, let length):
@@ -215,6 +258,7 @@ public import Kernel
                 }
             }
 
+            // Compute alignment
             let requestedOffset = range.offset
             let granularity = Kernel.System.allocationGranularity
             let alignedOffset = Kernel.System.alignDown(requestedOffset, to: granularity)
@@ -222,37 +266,6 @@ public import Kernel
             let pageSize = Kernel.System.pageSize
             let mappingLen = Kernel.System.alignUp(userLen + delta, to: pageSize)
 
-            // Phase 2: Acquire resources using helper that handles cleanup
-            let (mapping, lockToken) = try Self.acquireResources(
-                fileHandle: fileHandle,
-                alignedOffset: alignedOffset,
-                mappingLen: mappingLen,
-                access: access,
-                sharing: sharing,
-                effectiveSafety: effectiveSafety
-            )
-
-            // Phase 3: Initialize all stored properties (no throws after this point)
-            self.mappingBaseAddress = mapping.baseAddress
-            self.mappingLength = mappingLen
-            self.mappingHandle = mapping.mappingHandle
-            self.offsetDelta = delta
-            self.userLength = userLen
-            self.access = access
-            self.sharing = sharing
-            self.safety = effectiveSafety
-            self.lockToken = lockToken
-        }
-
-        /// Acquires mapping and lock resources, handling cleanup on failure.
-        private static func acquireResources(
-            fileHandle: Kernel.Descriptor,
-            alignedOffset: Int,
-            mappingLen: Int,
-            access: Access,
-            sharing: Sharing,
-            effectiveSafety: Safety
-        ) throws(MMap.Error) -> (Kernel.Mmap.WindowsMapping, MMap.Lock.Token?) {
             // Map the file
             let mapping: Kernel.Mmap.WindowsMapping
             do {
@@ -289,7 +302,15 @@ public import Kernel
                 lockToken = nil
             }
 
-            return (mapping, lockToken)
+            return (
+                baseAddress: mapping.baseAddress,
+                mappingLen: mappingLen,
+                mappingHandle: mapping.mappingHandle,
+                delta: delta,
+                userLen: userLen,
+                effectiveSafety: effectiveSafety,
+                lockToken: lockToken
+            )
         }
 
         /// Computes the lock range based on scope.
