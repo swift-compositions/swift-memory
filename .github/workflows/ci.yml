@@ -34,7 +34,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .build
-          key: macos-swift62-spm-v5-${{ hashFiles('Package.swift', 'Package@*.swift') }}
+          key: macos-swift62-spm-v6-${{ hashFiles('Package.swift', 'Package@*.swift') }}
           restore-keys: |
             macos-swift62-spm-
 
@@ -75,7 +75,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .build
-          key: linux-swift62-spm-v5-${{ hashFiles('Package.swift', 'Package@*.swift') }}
+          key: linux-swift62-spm-v6-${{ hashFiles('Package.swift', 'Package@*.swift') }}
           restore-keys: linux-swift62-spm-
 
       # Note: swift test builds automatically in release mode
@@ -98,7 +98,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .build
-          key: linux-swift62-compat-spm-v5-${{ hashFiles('Package.swift', 'Package@*.swift') }}
+          key: linux-swift62-compat-spm-v6-${{ hashFiles('Package.swift', 'Package@*.swift') }}
           restore-keys: linux-swift62-compat-spm-
 
       # Note: swift test builds automatically
@@ -128,7 +128,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .build
-          key: windows-swift62-spm-v3-${{ hashFiles('Package.swift', 'Package@*.swift') }}
+          key: windows-swift62-spm-v4-${{ hashFiles('Package.swift', 'Package@*.swift') }}
           restore-keys: windows-swift62-spm-
 
       # Note: swift test builds automatically
