@@ -12,6 +12,22 @@
 import MMap
 import Testing
 
+// MARK: - Test Helpers
+
+/// Creates an anonymous region using the platform-appropriate API.
+/// Windows uses a static factory method due to Swift compiler bugs.
+func makeAnonymousRegion(
+    length: Int,
+    access: MMap.Region.Access = [.read, .write],
+    sharing: MMap.Region.Sharing = .private
+) throws -> MMap.Region {
+    #if os(Windows)
+        return try MMap.Region.anonymous(length: length, access: access, sharing: sharing)
+    #else
+        return try MMap.Region(anonymousLength: length, access: access, sharing: sharing)
+    #endif
+}
+
 @Suite
 struct RegionTests {
 
@@ -19,7 +35,7 @@ struct RegionTests {
 
     @Test
     func anonymousMapping() throws {
-        let region = try MMap.Region(anonymousLength: 4096)
+        let region = try makeAnonymousRegion(length: 4096)
         let length = region.length
         let isMapped = region.isMapped
 
@@ -31,8 +47,8 @@ struct RegionTests {
 
     @Test
     func anonymousMappingReadWrite() throws {
-        let region = try MMap.Region(
-            anonymousLength: 4096,
+        let region = try makeAnonymousRegion(
+            length: 4096,
             access: [.read, .write]
         )
 
@@ -49,7 +65,7 @@ struct RegionTests {
     @Test
     func anonymousMappingDefaultAccess() throws {
         // Default for anonymous should be [.read, .write]
-        let region = try MMap.Region(anonymousLength: 4096)
+        let region = try makeAnonymousRegion(length: 4096)
 
         #expect(region.access.allowsRead)
         #expect(region.access.allowsWrite)
@@ -59,8 +75,8 @@ struct RegionTests {
 
     @Test
     func anonymousMappingReadOnly() throws {
-        let region = try MMap.Region(
-            anonymousLength: 4096,
+        let region = try makeAnonymousRegion(
+            length: 4096,
             access: .read
         )
 
@@ -75,8 +91,8 @@ struct RegionTests {
 
     @Test
     func withUnsafeBytes() throws {
-        let region = try MMap.Region(
-            anonymousLength: 4096,
+        let region = try makeAnonymousRegion(
+            length: 4096,
             access: [.read, .write]
         )
 
@@ -97,8 +113,8 @@ struct RegionTests {
 
     @Test
     func withUnsafeMutableBytes() throws {
-        let region = try MMap.Region(
-            anonymousLength: 4096,
+        let region = try makeAnonymousRegion(
+            length: 4096,
             access: [.read, .write]
         )
 
@@ -120,8 +136,8 @@ struct RegionTests {
 
     @Test
     func protectChangeAccess() throws {
-        var region = try MMap.Region(
-            anonymousLength: 4096,
+        var region = try makeAnonymousRegion(
+            length: 4096,
             access: [.read, .write]
         )
 
@@ -181,16 +197,16 @@ struct RegionTests {
     @Test
     func sharingModes() throws {
         // Private (copy-on-write) - default for anonymous
-        let privateRegion = try MMap.Region(
-            anonymousLength: 4096,
+        let privateRegion = try makeAnonymousRegion(
+            length: 4096,
             sharing: .private
         )
         #expect(privateRegion.sharing == .private)
         privateRegion.unmap()
 
         // Shared
-        let sharedRegion = try MMap.Region(
-            anonymousLength: 4096,
+        let sharedRegion = try makeAnonymousRegion(
+            length: 4096,
             sharing: .shared
         )
         #expect(sharedRegion.sharing == .shared)
@@ -201,8 +217,8 @@ struct RegionTests {
 
     @Test
     func syncAnonymous() throws {
-        let region = try MMap.Region(
-            anonymousLength: 4096,
+        let region = try makeAnonymousRegion(
+            length: 4096,
             access: [.read, .write]
         )
 
@@ -223,8 +239,8 @@ struct RegionTests {
 
     @Test
     func uncheckedSafety() throws {
-        let region = try MMap.Region(
-            anonymousLength: 4096,
+        let region = try makeAnonymousRegion(
+            length: 4096,
             access: [.read, .write]
         )
 
