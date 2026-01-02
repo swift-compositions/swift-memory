@@ -200,15 +200,15 @@ public import Kernel
         ///   - safety: The safety mode (defaults based on access).
         /// - Throws: `MMap.Error` if mapping fails.
         ///
-        /// - Note: Implementation uses a static helper to work around Swift compiler
-        ///   SIL verification issues with typed throws and ~Copyable on Windows.
+        /// - Note: Uses regular `throws` instead of typed throws to work around
+        ///   Swift compiler SIL verification bugs with typed throws + ~Copyable on Windows.
         public init(
             fileHandle: Kernel.Descriptor,
             range: Range,
             access: Access = .read,
             sharing: Sharing = .shared,
             safety: Safety? = nil
-        ) throws(MMap.Error) {
+        ) throws {
             // All throwing code must complete before any property assignment.
             // This works around a Swift SIL bug on Windows with typed throws + ~Copyable.
             let result = try Self._prepareFileMapping(
@@ -239,7 +239,7 @@ public import Kernel
             access: Access,
             sharing: Sharing,
             safety: Safety?
-        ) throws(MMap.Error) -> Prepared {
+        ) throws -> Prepared {
             // Validate access
             try access.validate()
 
