@@ -88,6 +88,36 @@ extension MMap {
         /// Lock token for `.coordinated` safety mode.
         var lockToken: Lock.Token?
 
+        #if os(Windows)
+            /// Internal memberwise initializer for Windows.
+            ///
+            /// This non-throwing init is used by the throwing factory to avoid
+            /// a Swift SIL verification bug on Windows where typed throws +
+            /// ~Copyable + Optional<Class> field causes incorrect destroy_addr
+            /// instructions in error paths.
+            internal init(
+                mappingBaseAddress: UnsafeMutableRawPointer,
+                mappingLength: Int,
+                mappingHandle: HANDLE,
+                offsetDelta: Int,
+                userLength: Int,
+                access: Access,
+                sharing: Sharing,
+                safety: Safety,
+                lockToken: Lock.Token?
+            ) {
+                self.mappingBaseAddress = mappingBaseAddress
+                self.mappingLength = mappingLength
+                self.mappingHandle = mappingHandle
+                self.offsetDelta = offsetDelta
+                self.userLength = userLength
+                self.access = access
+                self.sharing = sharing
+                self.safety = safety
+                self.lockToken = lockToken
+            }
+        #endif
+
         // MARK: - Computed Properties
 
         /// The base address for user access (adjusted for offset delta).

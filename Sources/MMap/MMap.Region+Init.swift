@@ -195,11 +195,33 @@ public import Kernel
             sharing: Sharing = .shared,
             safety: Safety? = nil
         ) throws(MMap.Error) {
-            // Phase 1: All validation and computation (no resources acquired)
+            // Delegate to static factory that returns a fully-constructed Region.
+            // This works around a Swift SIL verification bug on Windows where
+            // typed throws + ~Copyable + Optional<Class> field causes incorrect
+            // destroy_addr instructions in error paths.
+            self = try Self._create(
+                fileHandle: fileHandle,
+                range: range,
+                access: access,
+                sharing: sharing,
+                safety: safety
+            )
+        }
+
+        /// Static factory that creates a Region by calling the non-throwing memberwise init.
+        private static func _create(
+            fileHandle: Kernel.Descriptor,
+            range: Range,
+            access: Access,
+            sharing: Sharing,
+            safety: Safety?
+        ) throws(MMap.Error) -> Self {
+            // Validate access
             try access.validate()
 
             let effectiveSafety = safety ?? (access.allowsWrite ? .defaultForWrite : .defaultForRead)
 
+            // Compute user length
             let userLen: Int
             switch range {
             case .bytes(_, let length):
@@ -215,6 +237,7 @@ public import Kernel
                 }
             }
 
+            // Compute alignment
             let requestedOffset = range.offset
             let granularity = Kernel.System.allocationGranularity
             let alignedOffset = Kernel.System.alignDown(requestedOffset, to: granularity)
@@ -222,37 +245,6 @@ public import Kernel
             let pageSize = Kernel.System.pageSize
             let mappingLen = Kernel.System.alignUp(userLen + delta, to: pageSize)
 
-            // Phase 2: Acquire resources using helper that handles cleanup
-            let (mapping, lockToken) = try Self.acquireResources(
-                fileHandle: fileHandle,
-                alignedOffset: alignedOffset,
-                mappingLen: mappingLen,
-                access: access,
-                sharing: sharing,
-                effectiveSafety: effectiveSafety
-            )
-
-            // Phase 3: Initialize all stored properties (no throws after this point)
-            self.mappingBaseAddress = mapping.baseAddress
-            self.mappingLength = mappingLen
-            self.mappingHandle = mapping.mappingHandle
-            self.offsetDelta = delta
-            self.userLength = userLen
-            self.access = access
-            self.sharing = sharing
-            self.safety = effectiveSafety
-            self.lockToken = lockToken
-        }
-
-        /// Acquires mapping and lock resources, handling cleanup on failure.
-        private static func acquireResources(
-            fileHandle: Kernel.Descriptor,
-            alignedOffset: Int,
-            mappingLen: Int,
-            access: Access,
-            sharing: Sharing,
-            effectiveSafety: Safety
-        ) throws(MMap.Error) -> (Kernel.Mmap.WindowsMapping, MMap.Lock.Token?) {
             // Map the file
             let mapping: Kernel.Mmap.WindowsMapping
             do {
@@ -289,7 +281,17 @@ public import Kernel
                 lockToken = nil
             }
 
-            return (mapping, lockToken)
+            return Self(
+                mappingBaseAddress: mapping.baseAddress,
+                mappingLength: mappingLen,
+                mappingHandle: mapping.mappingHandle,
+                offsetDelta: delta,
+                userLength: userLen,
+                access: access,
+                sharing: sharing,
+                safety: effectiveSafety,
+                lockToken: lockToken
+            )
         }
 
         /// Computes the lock range based on scope.
