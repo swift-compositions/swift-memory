@@ -145,35 +145,40 @@ public import Kernel
             return (baseAddress, lockToken)
         }
 
-        /// Computes the lock range based on scope.
-        ///
-        /// For `.mappedRange`, the lock range is rounded to the platform's mapping granularity:
-        /// - POSIX: page size
-        /// - Windows: allocation granularity (64KB typically)
-        ///
-        /// This ensures the lock covers exactly the memory region that could be faulted.
-        ///
-        /// - Note: Rounding may lock bytes beyond the logical user-requested range.
-        ///   This is intentional: the lock must cover every byte that the OS mapping
-        ///   could fault on, which includes the padding bytes up to the next granularity
-        ///   boundary.
-        private static func computeLockRange(
-            scope: Safety.Scope,
-            alignedOffset: Int,
-            mappingLength: Int
-        ) -> Kernel.Lock.Range {
-            switch scope {
-            case .file:
-                return .file
-            case .mappedRange:
-                let granularity = Kernel.System.allocationGranularity
-                let end = alignedOffset + mappingLength
-                let roundedEnd = Kernel.System.alignUp(end, to: granularity)
-                return .bytes(start: UInt64(alignedOffset), end: UInt64(roundedEnd))
-            }
-        }
     }
 #endif
+
+// MARK: - Lock Range Computation (Shared)
+
+extension MMap.Region {
+    /// Computes the lock range based on scope.
+    ///
+    /// For `.mappedRange`, the lock range is rounded to the platform's mapping granularity:
+    /// - POSIX: page size
+    /// - Windows: allocation granularity (64KB typically)
+    ///
+    /// This ensures the lock covers exactly the memory region that could be faulted.
+    ///
+    /// - Note: Rounding may lock bytes beyond the logical user-requested range.
+    ///   This is intentional: the lock must cover every byte that the OS mapping
+    ///   could fault on, which includes the padding bytes up to the next granularity
+    ///   boundary.
+    static func computeLockRange(
+        scope: Safety.Scope,
+        alignedOffset: Int,
+        mappingLength: Int
+    ) -> Kernel.Lock.Range {
+        switch scope {
+        case .file:
+            return .file
+        case .mappedRange:
+            let granularity = Kernel.System.allocationGranularity
+            let end = alignedOffset + mappingLength
+            let roundedEnd = Kernel.System.alignUp(end, to: granularity)
+            return .bytes(start: UInt64(alignedOffset), end: UInt64(roundedEnd))
+        }
+    }
+}
 
 // MARK: - File-backed Initialization (Windows)
 
@@ -276,23 +281,6 @@ public import Kernel
                 safety: effectiveSafety,
                 lockToken: lockToken
             )
-        }
-
-        /// Computes the lock range based on scope.
-        private static func computeLockRange(
-            scope: Safety.Scope,
-            alignedOffset: Int,
-            mappingLength: Int
-        ) -> Kernel.Lock.Range {
-            switch scope {
-            case .file:
-                return .file
-            case .mappedRange:
-                let granularity = Kernel.System.allocationGranularity
-                let end = alignedOffset + mappingLength
-                let roundedEnd = Kernel.System.alignUp(end, to: granularity)
-                return .bytes(start: UInt64(alignedOffset), end: UInt64(roundedEnd))
-            }
         }
     }
 #endif
