@@ -1,8 +1,8 @@
 // ===----------------------------------------------------------------------===//
 //
-// This source file is part of the swift-mmap open source project
+// This source file is part of the swift-memory open source project
 //
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-mmap project authors
+// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE for license information
@@ -13,7 +13,7 @@ public import Kernel
 
 // MARK: - Consuming Operations
 
-extension MMap.Region {
+extension Memory.Map {
     /// Unmaps the region and releases all resources.
     ///
     /// This is the canonical way to release a mapping. After calling `unmap()`,
@@ -29,11 +29,11 @@ extension MMap.Region {
         // Unmap the region
         #if os(Windows)
             if let handle = mappingHandle {
-                try? Kernel.Mmap.unmap(Kernel.Mmap.WindowsMapping(baseAddress: base, mappingHandle: handle))
+                try? Kernel.Memory.Map.unmap(Kernel.Memory.Map.WindowsMapping(baseAddress: base, mappingHandle: handle))
             }
             mappingHandle = nil
         #else
-            try? Kernel.Mmap.unmap(addr: base, length: mappingLength)
+            try? Kernel.Memory.Map.unmap(addr: base, length: Kernel.File.Size(mappingLength))
         #endif
 
         // Mark as unmapped so deinit becomes a no-op
@@ -44,7 +44,7 @@ extension MMap.Region {
 // MARK: - Remap
 
 #if !os(Windows)
-    extension MMap.Region {
+    extension Memory.Map {
         /// Remaps the region to a new range.
         ///
         /// This is a consuming operation that:
@@ -56,13 +56,13 @@ extension MMap.Region {
         ///   - fileDescriptor: The file descriptor to map.
         ///   - range: The new range to map.
         /// - Returns: A new `Region` with the specified range.
-        /// - Throws: `MMap.Error` if remapping fails.
+        /// - Throws: `Memory.Error` if remapping fails.
         ///
         /// - Note: On Linux, this may use `mremap()` for efficiency when possible.
         public consuming func remap(
             fileDescriptor: Kernel.Descriptor,
             range: Range
-        ) throws(MMap.Error) -> Self {
+        ) throws(Memory.Error) -> Self {
             // Capture values before consuming self
             let capturedAccess = access
             let capturedSharing = sharing
@@ -84,7 +84,7 @@ extension MMap.Region {
 #endif
 
 #if os(Windows)
-    extension MMap.Region {
+    extension Memory.Map {
         /// Remaps the region to a new range.
         ///
         /// This is a consuming operation that:
@@ -96,11 +96,11 @@ extension MMap.Region {
         ///   - fileHandle: The file handle to map.
         ///   - range: The new range to map.
         /// - Returns: A new `Region` with the specified range.
-        /// - Throws: `MMap.Error` if remapping fails.
+        /// - Throws: `Memory.Error` if remapping fails.
         public consuming func remap(
             fileHandle: Kernel.Descriptor,
             range: Range
-        ) throws(MMap.Error) -> Self {
+        ) throws(Memory.Error) -> Self {
             // Capture values before consuming self
             let capturedAccess = access
             let capturedSharing = sharing
@@ -121,7 +121,7 @@ extension MMap.Region {
 
 // MARK: - Access Methods
 
-extension MMap.Region {
+extension Memory.Map {
     /// Accesses a byte at the given index.
     ///
     /// - Parameter index: The byte index (0-based).
@@ -159,7 +159,7 @@ extension MMap.Region {
     public func withUnsafeMutableBytes<T>(
         _ body: (UnsafeMutableRawBufferPointer) throws -> T
     ) rethrows -> T {
-        precondition(access.allowsWrite, "Mapping does not allow writes")
+        precondition(access.allows.write, "Mapping does not allow writes")
         guard let base = mutableBaseAddress else {
             preconditionFailure("Mapping is not valid")
         }
@@ -175,7 +175,7 @@ extension MMap.Region {
     /// - Precondition: The mapping must have write access.
     /// - Precondition: `index` must be in bounds.
     public func write(_ value: UInt8, at index: Int) {
-        precondition(access.allowsWrite, "Mapping does not allow writes")
+        precondition(access.allows.write, "Mapping does not allow writes")
         precondition(index >= 0 && index < userLength, "Index out of bounds")
         guard let base = mutableBaseAddress else {
             preconditionFailure("Mapping is not valid")
@@ -186,7 +186,7 @@ extension MMap.Region {
 
 // MARK: - Protection
 
-extension MMap.Region {
+extension Memory.Map {
     /// Changes the memory protection of the mapped region.
     ///
     /// This allows runtime modification of access permissions, for example:
@@ -194,53 +194,53 @@ extension MMap.Region {
     /// - Removing write access after initialization is complete
     ///
     /// - Parameter newAccess: The new access permissions.
-    /// - Throws: `MMap.Error` if protection change fails.
+    /// - Throws: `Memory.Error` if protection change fails.
     ///
     /// - Note: The new access must be compatible with the original file
     ///   descriptor's open mode. You cannot add write access to a region
     ///   mapped from a read-only file descriptor.
-    public mutating func protect(_ newAccess: Access) throws(MMap.Error) {
+    public mutating func protect(_ newAccess: Access) throws(Memory.Error) {
         try newAccess.validate()
 
         guard let base = mappingBaseAddress else {
-            throw .alreadyUnmapped
+            throw .unmapped
         }
 
-        do {
-            try Kernel.Mmap.protect(
+        do throws(Kernel.Memory.Map.Error) {
+            try Kernel.Memory.Map.protect(
                 addr: base,
-                length: mappingLength,
+                length: Kernel.File.Size(mappingLength),
                 protection: newAccess.kernelProtection
             )
             access = newAccess
         } catch {
-            throw MMap.Error(from: error)
+            throw Memory.Error(from: error)
         }
     }
 }
 
 // MARK: - Synchronization
 
-extension MMap.Region {
+extension Memory.Map {
     /// Synchronizes the mapped region to disk.
     ///
     /// - Parameter async: If `true`, returns immediately and syncs asynchronously.
     ///                    (Ignored on Windows, which only has synchronous flush.)
-    /// - Throws: `MMap.Error` if sync fails.
-    public func sync(async: Bool = false) throws(MMap.Error) {
+    /// - Throws: `Memory.Error` if sync fails.
+    public func sync(async: Bool = false) throws(Memory.Error) {
         guard let base = mappingBaseAddress else {
-            throw .alreadyUnmapped
+            throw .unmapped
         }
 
-        do {
+        do throws(Kernel.Memory.Map.Error) {
             #if os(Windows)
-                try Kernel.Mmap.sync(addr: base, length: mappingLength)
+                try Kernel.Memory.Map.sync(addr: base, length: Kernel.File.Size(mappingLength))
             #else
-                let flags: Kernel.Mmap.SyncFlags = async ? .async : .sync
-                try Kernel.Mmap.sync(addr: base, length: mappingLength, flags: flags)
+                let flags: Kernel.Memory.Map.Sync.Flags = async ? .async : .sync
+                try Kernel.Memory.Map.sync(addr: base, length: Kernel.File.Size(mappingLength), flags: flags)
             #endif
         } catch {
-            throw MMap.Error(from: error)
+            throw Memory.Error(from: error)
         }
     }
 
@@ -249,15 +249,15 @@ extension MMap.Region {
     /// This is advisory - the system may ignore the hint.
     ///
     /// - Parameter advice: The access pattern hint.
-    public func advise(_ advice: Kernel.Mmap.Advice) {
+    public func advise(_ advice: Kernel.Memory.Map.Advice) {
         guard let base = mappingBaseAddress else { return }
-        Kernel.Mmap.advise(addr: base, length: mappingLength, advice: advice)
+        Kernel.Memory.Map.advise(addr: base, length: Kernel.File.Size(mappingLength), advice: advice)
     }
 }
 
 // MARK: - Debug Description
 
-extension MMap.Region {
+extension Memory.Map {
     /// A textual representation for debugging.
     public var debugDescription: String {
         let status = isMapped ? "mapped" : "unmapped"

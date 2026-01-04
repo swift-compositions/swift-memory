@@ -1,15 +1,15 @@
 // ===----------------------------------------------------------------------===//
 //
-// This source file is part of the swift-mmap open source project
+// This source file is part of the swift-memory open source project
 //
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-mmap project authors
+// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE for license information
 //
 // ===----------------------------------------------------------------------===//
 
-extension MMap.Region {
+extension Memory.Map {
     /// Range specification for mapping.
     public enum Range: Sendable, Equatable {
         /// Map a specific byte range.
@@ -27,25 +27,29 @@ extension MMap.Region {
         ///
         /// - Important: This is not a live view. If the file grows after mapping,
         ///   the region does **not** automatically extend.
-        case wholeFile
+        case whole
+    }
+}
 
-        /// The starting offset.
-        public var offset: Int {
-            switch self {
-            case .bytes(let offset, _): return offset
-            case .wholeFile: return 0
-            }
+// MARK: - Computed Properties
+
+extension Memory.Map.Range {
+    /// The starting offset.
+    public var offset: Int {
+        switch self {
+        case .bytes(let offset, _): return offset
+        case .whole: return 0
         }
+    }
 
-        /// The length for a specific byte range.
-        ///
-        /// - Note: For `.wholeFile`, returns nil. The actual length is resolved
-        ///         at map time by querying the file.
-        public var length: Int? {
-            switch self {
-            case .bytes(_, let length): return length
-            case .wholeFile: return nil
-            }
+    /// The length for a specific byte range.
+    ///
+    /// - Note: For `.whole`, returns nil. The actual length is resolved
+    ///         at map time by querying the file.
+    public var length: Int? {
+        switch self {
+        case .bytes(_, let length): return length
+        case .whole: return nil
         }
     }
 }

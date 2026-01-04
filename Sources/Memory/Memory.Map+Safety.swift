@@ -1,8 +1,8 @@
 // ===----------------------------------------------------------------------===//
 //
-// This source file is part of the swift-mmap open source project
+// This source file is part of the swift-memory open source project
 //
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-mmap project authors
+// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE for license information
@@ -11,7 +11,7 @@
 
 public import Kernel
 
-extension MMap.Region {
+extension Memory.Map {
     /// Safety mode for SIGBUS/access-violation protection.
     public enum Safety: Sendable, Equatable {
         /// Coordinated access with file locking.
@@ -21,7 +21,7 @@ extension MMap.Region {
         ///
         /// - Parameters:
         ///   - kind: The lock kind (.shared for read, .exclusive for write).
-        ///   - scope: The lock scope (.file or .mappedRange).
+        ///   - scope: The lock scope (.file or .mapped).
         case coordinated(Kernel.Lock.Kind, scope: Scope)
 
         /// Unchecked access with no locking.
@@ -31,23 +31,37 @@ extension MMap.Region {
         ///
         /// Use for: append-only files, immutable snapshots, WAL segments.
         case unchecked
+    }
+}
 
-        /// Lock scope for coordinated safety.
-        public enum Scope: Sendable, Equatable {
-            /// Lock the entire file.
-            case file
-            /// Lock the mapped range (rounded to granularity).
-            case mappedRange
-        }
+// MARK: - Scope
 
+extension Memory.Map.Safety {
+    /// Lock scope for coordinated safety.
+    public enum Scope: Sendable, Equatable {
+        /// Lock the entire file.
+        case file
+        /// Lock the mapped range (rounded to granularity).
+        case mapped
+    }
+}
+
+// MARK: - Default Accessor
+
+extension Memory.Map.Safety {
+    /// Nested accessor for default safety modes.
+    public static var `default`: Default.Type { Default.self }
+
+    /// Default safety modes.
+    public enum Default {
         /// Default safety for read access.
-        public static var defaultForRead: Safety {
-            .coordinated(.shared, scope: .mappedRange)
+        public static var read: Memory.Map.Safety {
+            .coordinated(.shared, scope: .mapped)
         }
 
         /// Default safety for write access.
-        public static var defaultForWrite: Safety {
-            .coordinated(.exclusive, scope: .mappedRange)
+        public static var write: Memory.Map.Safety {
+            .coordinated(.exclusive, scope: .mapped)
         }
     }
 }

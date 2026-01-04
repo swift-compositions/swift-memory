@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "swift-mmap",
+    name: "swift-memory",
     platforms: [
         .macOS(.v26),
         .iOS(.v26),
@@ -12,24 +12,24 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "MMap",
-            targets: ["MMap"]
+            name: "Memory",
+            targets: ["Memory"]
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/coenttb/swift-kernel.git", from: "0.3.0"),
+        .package(path: "../swift-kernel"),
     ],
     targets: [
         .target(
-            name: "MMap",
+            name: "Memory",
             dependencies: [
                 .product(name: "Kernel", package: "swift-kernel"),
             ]
         ),
         .testTarget(
-            name: "MMap Tests",
+            name: "Memory Tests",
             dependencies: [
-                "MMap",
+                "Memory",
             ]
         ),
     ]

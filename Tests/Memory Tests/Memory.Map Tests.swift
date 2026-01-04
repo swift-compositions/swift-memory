@@ -1,15 +1,16 @@
 // ===----------------------------------------------------------------------===//
 //
-// This source file is part of the swift-mmap open source project
+// This source file is part of the swift-memory open source project
 //
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-mmap project authors
+// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE for license information
 //
 // ===----------------------------------------------------------------------===//
 
-import MMap
+import Kernel
+import Memory
 import Testing
 
 // MARK: - Test Helpers
@@ -18,13 +19,13 @@ import Testing
 /// Windows uses a static factory method due to Swift compiler bugs.
 func makeAnonymousRegion(
     length: Int,
-    access: MMap.Region.Access = [.read, .write],
-    sharing: MMap.Region.Sharing = .private
-) throws -> MMap.Region {
+    access: Memory.Map.Access = [.read, .write],
+    sharing: Memory.Map.Sharing = .private
+) throws -> Memory.Map {
     #if os(Windows)
-        return try MMap.Region.anonymous(length: length, access: access, sharing: sharing)
+        return try Memory.Map.anonymous(length: length, access: access, sharing: sharing)
     #else
-        return try MMap.Region(anonymousLength: length, access: access, sharing: sharing)
+        return try Memory.Map(anonymousLength: length, access: access, sharing: sharing)
     #endif
 }
 
@@ -67,8 +68,8 @@ struct RegionTests {
         // Default for anonymous should be [.read, .write]
         let region = try makeAnonymousRegion(length: 4096)
 
-        #expect(region.access.allowsRead)
-        #expect(region.access.allowsWrite)
+        #expect(region.access.allows.read)
+        #expect(region.access.allows.write)
 
         region.unmap()
     }
@@ -80,8 +81,8 @@ struct RegionTests {
             access: .read
         )
 
-        #expect(region.access.allowsRead)
-        #expect(!region.access.allowsWrite)
+        #expect(region.access.allows.read)
+        #expect(!region.access.allows.write)
         #expect(region.mutableBaseAddress == nil)
 
         region.unmap()
@@ -148,13 +149,13 @@ struct RegionTests {
         try region.protect(.read)
 
         #expect(region.access == .read)
-        #expect(!region.access.allowsWrite)
+        #expect(!region.access.allows.write)
         #expect(region[0] == 42)  // Can still read
 
         // Change back to read-write
         try region.protect([.read, .write])
 
-        #expect(region.access.allowsWrite)
+        #expect(region.access.allows.write)
         region.write(100, at: 0)
         #expect(region[0] == 100)
 
@@ -165,16 +166,16 @@ struct RegionTests {
 
     @Test
     func pageSizeIsPositive() {
-        #expect(MMap.pageSize > 0)
+        #expect(Memory.page.size > 0)
         // Common page sizes: 4096, 16384
-        #expect(MMap.pageSize >= 4096)
+        #expect(Memory.page.size >= 4096)
     }
 
     @Test
     func allocationGranularityIsPositive() {
-        #expect(MMap.allocationGranularity > 0)
+        #expect(Memory.allocation.granularity > 0)
         // Must be at least page size
-        #expect(MMap.allocationGranularity >= MMap.pageSize)
+        #expect(Memory.allocation.granularity >= Memory.page.size)
     }
 
     // MARK: - Access Validation Tests
@@ -182,14 +183,14 @@ struct RegionTests {
     @Test
     func accessValidation() throws {
         // Read-only is valid
-        let readAccess: MMap.Region.Access = .read
-        #expect(readAccess.allowsRead)
-        #expect(!readAccess.allowsWrite)
+        let readAccess: Memory.Map.Access = .read
+        #expect(readAccess.allows.read)
+        #expect(!readAccess.allows.write)
 
         // Read-write is valid
-        let rwAccess: MMap.Region.Access = [.read, .write]
-        #expect(rwAccess.allowsRead)
-        #expect(rwAccess.allowsWrite)
+        let rwAccess: Memory.Map.Access = [.read, .write]
+        #expect(rwAccess.allows.read)
+        #expect(rwAccess.allows.write)
     }
 
     // MARK: - Sharing Tests
@@ -257,13 +258,13 @@ struct RegionTests {
 struct RangeTests {
     @Test
     func bytesRange() {
-        let range = MMap.Region.Range.bytes(offset: 100, length: 500)
+        let range = Memory.Map.Range.bytes(offset: 100, length: 500)
         #expect(range.offset == 100)
     }
 
     @Test
     func wholeFileRange() {
-        let range = MMap.Region.Range.wholeFile
+        let range = Memory.Map.Range.whole
         #expect(range.offset == 0)
     }
 }
@@ -274,20 +275,12 @@ struct RangeTests {
 struct ErrorTests {
     @Test
     func errorDescriptions() {
-        let errors: [MMap.Error] = [
-            .unsupported,
-            .invalidRange,
-            .invalidAlignment,
-            .invalidAccess,
-            .permissionDenied,
-            .outOfMemory,
-            .fileTooSmall,
-            .mappingSizeLimit,
-            .unsupportedConfiguration,
-            .invalidHandle,
-            .unsupportedFileType,
-            .alreadyUnmapped,
-            .platform(code: 42, message: "test error"),
+        let errors: [Memory.Error] = [
+            .access,
+            .size,
+            .unmapped,
+            .map(.map(.posix(22))),
+            .page(.lock(.posix(1))),
         ]
 
         for error in errors {

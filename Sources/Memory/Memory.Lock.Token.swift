@@ -1,8 +1,8 @@
 // ===----------------------------------------------------------------------===//
 //
-// This source file is part of the swift-mmap open source project
+// This source file is part of the swift-memory open source project
 //
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-mmap project authors
+// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE for license information
@@ -11,28 +11,28 @@
 
 import Kernel
 
-extension MMap {
+extension Memory {
     /// File locking namespace for memory mapping.
     public enum Lock {}
 }
 
-extension MMap.Lock {
+extension Memory.Lock {
     /// A class wrapper that holds a file lock for the Region's lifetime.
     ///
     /// This is a class because `~Copyable` types cannot be stored directly
     /// in optional fields. The class provides the necessary indirection for
-    /// `MMap.Region`'s optional lock storage.
+    /// `Memory.Map`'s optional lock storage.
     ///
     /// ## Why a class?
     ///
     /// `Kernel.Lock.Token` is `~Copyable` for proper RAII semantics, but
-    /// `MMap.Region` needs to optionally hold a lock token. Since Swift
+    /// `Memory.Map` needs to optionally hold a lock token. Since Swift
     /// doesn't allow `Optional<~Copyable>`, we use a class wrapper.
     ///
     /// ## Usage
     ///
-    /// This type is internal to the MMap module. Users interact with
-    /// locking through `MMap.Region.Safety` configuration.
+    /// This type is internal to the Memory module. Users interact with
+    /// locking through `Memory.Map.Safety` configuration.
     final class Token: @unchecked Sendable {
         private let descriptor: Kernel.Descriptor
         private let range: Kernel.Lock.Range
@@ -75,13 +75,6 @@ extension MMap.Lock {
             }
         }
 
-        /// Releases the lock.
-        func release() {
-            guard !isReleased else { return }
-            isReleased = true
-            try? Kernel.Lock.unlock(descriptor, range: range)
-        }
-
         deinit {
             guard !isReleased else { return }
             try? Kernel.Lock.unlock(descriptor, range: range)
@@ -89,9 +82,20 @@ extension MMap.Lock {
     }
 }
 
+// MARK: - Release
+
+extension Memory.Lock.Token {
+    /// Releases the lock.
+    func release() {
+        guard !isReleased else { return }
+        isReleased = true
+        try? Kernel.Lock.unlock(descriptor, range: range)
+    }
+}
+
 // MARK: - Deadline-based Acquisition
 
-extension MMap.Lock.Token {
+extension Memory.Lock.Token {
     /// Polls for a lock until the deadline expires.
     ///
     /// Uses exponential backoff starting at 1ms, capped at 100ms.
