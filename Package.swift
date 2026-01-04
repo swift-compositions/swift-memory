@@ -18,6 +18,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../swift-kernel"),
+        .package(url: "https://github.com/swift-standards/swift-standards", from: "0.27.3"),
     ],
     targets: [
         .target(
@@ -30,6 +31,8 @@ let package = Package(
             name: "Memory Tests",
             dependencies: [
                 "Memory",
+                .product(name: "Kernel Test Support", package: "swift-kernel"),
+                .product(name: "StandardsTestSupport", package: "swift-standards"),
             ]
         ),
     ]
