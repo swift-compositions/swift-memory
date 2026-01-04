@@ -36,10 +36,45 @@ extension Memory.Page {
     ///
     /// ## Platform Notes
     ///
-    /// - **macOS**: Requires `com.apple.developer.kernel.memory-allocation` entitlement
-    /// - **Linux**: Subject to `RLIMIT_MEMLOCK` resource limit
-    /// - **Windows**: Uses `VirtualLock`; no `all.lock`/`all.unlock` equivalent
+    /// ### macOS
+    /// Requires `com.apple.developer.kernel.memory-allocation` entitlement.
+    /// Without the entitlement, `mlock` calls fail with `EPERM`.
+    ///
+    /// ### Linux
+    /// Subject to `RLIMIT_MEMLOCK` resource limit (default often 64KB).
+    /// Use `ulimit -l` to check/increase the limit.
+    ///
+    /// ### Windows
+    /// Uses `VirtualLock`/`VirtualUnlock` for individual ranges.
+    ///
+    /// **Limitations:**
+    /// - No process-wide locking (`all.lock`/`all.unlock` unavailable)
+    /// - Locked pages count against the process working set quota
+    /// - The minimum working set size may need adjustment via `SetProcessWorkingSetSize`
+    /// - Use `isProcessWideLockingSupported` to check availability at runtime
     public enum Lock {}
+}
+
+// MARK: - Platform Capabilities
+
+extension Memory.Page.Lock {
+    /// Whether process-wide page locking is supported on this platform.
+    ///
+    /// - Returns: `true` on POSIX systems (macOS, Linux), `false` on Windows.
+    ///
+    /// Use this to conditionally enable process-wide locking:
+    /// ```swift
+    /// if Memory.Page.Lock.isProcessWideLockingSupported {
+    ///     try Memory.Page.Lock.all.lock(.current)
+    /// }
+    /// ```
+    public static var isProcessWideLockingSupported: Bool {
+        #if os(Windows)
+        return false
+        #else
+        return true
+        #endif
+    }
 }
 
 // MARK: - Lock/Unlock Individual Ranges
@@ -51,7 +86,7 @@ extension Memory.Page.Lock {
     ///   - address: The starting address of the memory range.
     ///   - size: The number of bytes to lock.
     /// - Throws: `Memory.Error` if locking fails.
-    public static func lock(address: UnsafeRawPointer, size: Int) throws(Memory.Error) {
+    public static func lock(address: UnsafeRawPointer, size: Kernel.File.Size) throws(Memory.Error) {
         do throws(Kernel.Memory.Lock.Error) {
             try Kernel.Memory.Lock.lock(address: address, length: size)
         } catch {
@@ -65,7 +100,7 @@ extension Memory.Page.Lock {
     ///   - address: The starting address of the memory range.
     ///   - size: The number of bytes to unlock.
     /// - Throws: `Memory.Error` if unlocking fails.
-    public static func unlock(address: UnsafeRawPointer, size: Int) throws(Memory.Error) {
+    public static func unlock(address: UnsafeRawPointer, size: Kernel.File.Size) throws(Memory.Error) {
         do throws(Kernel.Memory.Lock.Error) {
             try Kernel.Memory.Lock.unlock(address: address, length: size)
         } catch {
@@ -85,7 +120,7 @@ extension Memory.Page.Lock {
         guard let base = map.baseAddress else {
             throw .unmapped
         }
-        try lock(address: base, size: Int(map.length))
+        try lock(address: base, size: map.length)
     }
 
     /// Unlocks an entire memory mapping.
@@ -96,7 +131,7 @@ extension Memory.Page.Lock {
         guard let base = map.baseAddress else {
             throw .unmapped
         }
-        try unlock(address: base, size: Int(map.length))
+        try unlock(address: base, size: map.length)
     }
 }
 

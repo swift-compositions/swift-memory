@@ -73,4 +73,40 @@ extension Memory.Allocation {
     public static var granularity: Int {
         Kernel.System.allocationGranularity
     }
+
+    /// Rounds an offset down to the allocation granularity boundary.
+    ///
+    /// - Parameter offset: The offset to align.
+    /// - Returns: The largest granularity-aligned offset ≤ `offset`.
+    @inlinable
+    public static func alignDown(_ offset: Kernel.File.Offset) -> Kernel.File.Offset {
+        Kernel.System.alignDown(offset, to: granularity)
+    }
+
+    /// Rounds an offset up to the allocation granularity boundary.
+    ///
+    /// - Parameter offset: The offset to align.
+    /// - Returns: The smallest granularity-aligned offset ≥ `offset`.
+    @inlinable
+    public static func alignUp(_ offset: Kernel.File.Offset) -> Kernel.File.Offset {
+        Kernel.System.alignUp(offset, to: granularity)
+    }
+
+    /// Rounds a size down to the allocation granularity boundary.
+    ///
+    /// - Parameter size: The size to align.
+    /// - Returns: The largest granularity-aligned size ≤ `size`.
+    @inlinable
+    public static func alignDown(_ size: Kernel.File.Size) -> Kernel.File.Size {
+        Kernel.System.alignDown(size, to: granularity)
+    }
+
+    /// Rounds a size up to the allocation granularity boundary.
+    ///
+    /// - Parameter size: The size to align.
+    /// - Returns: The smallest granularity-aligned size ≥ `size`.
+    @inlinable
+    public static func alignUp(_ size: Kernel.File.Size) -> Kernel.File.Size {
+        Kernel.System.alignUp(size, to: granularity)
+    }
 }

@@ -68,14 +68,13 @@ public import Kernel
             let requestedOffset = range.offset
             let granularity = Kernel.System.allocationGranularity
             // Align down to granularity boundary
-            let alignedOffset = Kernel.File.Offset(Kernel.System.alignDown(Int(requestedOffset._rawValue), to: granularity))
+            let alignedOffset = Kernel.System.alignDown(requestedOffset, to: granularity)
             // Delta is always non-negative (alignDown rounds down)
-            let offsetDelta = requestedOffset - alignedOffset
-            let delta = Kernel.File.Size(offsetDelta._rawValue)
+            let delta = Kernel.File.Size(requestedOffset - alignedOffset)
             // Compute total mapping length, aligned up to page size
             let pageSize = Kernel.System.pageSize
             let totalLength = userLen + delta
-            let mappingLen = Kernel.File.Size(Kernel.System.alignUp(Int(totalLength._rawValue), to: pageSize))
+            let mappingLen = Kernel.System.alignUp(totalLength, to: pageSize)
 
             // Phase 2: Acquire resources using helper that handles cleanup
             let (region, lockToken) = try Self.acquireResources(
@@ -147,6 +146,37 @@ public import Kernel
             return (region, lockToken)
         }
 
+        // MARK: - Static Factory Methods (API Parity with Windows)
+
+        /// Creates a memory-mapped region from a file descriptor.
+        ///
+        /// This static factory method provides API parity with Windows.
+        /// It is equivalent to calling the throwing initializer directly.
+        ///
+        /// - Parameters:
+        ///   - fileDescriptor: The POSIX file descriptor to map.
+        ///   - range: The range to map (offset will be aligned to allocation granularity).
+        ///   - access: The access mode (default: `.read`).
+        ///   - sharing: The sharing mode (default: `.shared`).
+        ///   - safety: The safety mode (defaults based on access).
+        /// - Returns: A new `Map` for the file.
+        /// - Throws: `Memory.Error` if mapping fails.
+        public static func open(
+            fileDescriptor: Kernel.Descriptor,
+            range: Range,
+            access: Access = .read,
+            sharing: Sharing = .shared,
+            safety: Safety? = nil
+        ) throws(Memory.Error) -> Self {
+            try Self(
+                fileDescriptor: fileDescriptor,
+                range: range,
+                access: access,
+                sharing: sharing,
+                safety: safety
+            )
+        }
+
     }
 #endif
 
@@ -174,10 +204,7 @@ extension Memory.Map {
         case .file:
             return .file
         case .mapped:
-            let granularity = Kernel.System.allocationGranularity
-            let endOffset = alignedOffset + mappingLength
-            let roundedEnd = Kernel.File.Offset(Kernel.System.alignUp(Int(endOffset._rawValue), to: granularity))
-            return .bytes(start: alignedOffset, end: roundedEnd)
+            return Kernel.Lock.Range(forMappingAt: alignedOffset, length: mappingLength)
         }
     }
 }
@@ -234,14 +261,13 @@ extension Memory.Map {
             let requestedOffset = range.offset
             let granularity = Kernel.System.allocationGranularity
             // Align down to granularity boundary
-            let alignedOffset = Kernel.File.Offset(Kernel.System.alignDown(Int(requestedOffset._rawValue), to: granularity))
+            let alignedOffset = Kernel.System.alignDown(requestedOffset, to: granularity)
             // Delta is always non-negative (alignDown rounds down)
-            let offsetDelta = requestedOffset - alignedOffset
-            let delta = Kernel.File.Size(offsetDelta._rawValue)
+            let delta = Kernel.File.Size(requestedOffset - alignedOffset)
             // Compute total mapping length, aligned up to page size
             let pageSize = Kernel.System.pageSize
             let totalLength = userLen + delta
-            let mappingLen = Kernel.File.Size(Kernel.System.alignUp(Int(totalLength._rawValue), to: pageSize))
+            let mappingLen = Kernel.System.alignUp(totalLength, to: pageSize)
 
             // Map the file
             let region: Kernel.Memory.Map.Region
@@ -313,7 +339,7 @@ extension Memory.Map {
             try access.validate()
 
             let pageSize = Kernel.System.pageSize
-            let mappingLen = Kernel.File.Size(Kernel.System.alignUp(Int(length), to: pageSize))
+            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
 
             let region: Kernel.Memory.Map.Region
             do throws(Kernel.Memory.Map.Error) {
@@ -333,6 +359,25 @@ extension Memory.Map {
             self.sharing = sharing
             self.safety = .unchecked
             self.lockToken = nil
+        }
+
+        /// Creates an anonymous memory mapping (not backed by a file).
+        ///
+        /// This static factory method provides API parity with Windows.
+        /// It is equivalent to calling the throwing initializer directly.
+        ///
+        /// - Parameters:
+        ///   - length: The number of bytes to map.
+        ///   - access: The access mode (default: `[.read, .write]`).
+        ///   - sharing: The sharing mode (default: `.private`).
+        /// - Returns: A new anonymous `Map`.
+        /// - Throws: `Memory.Error` if mapping fails.
+        public static func anonymous(
+            length: Kernel.File.Size,
+            access: Access = [.read, .write],
+            sharing: Sharing = .private
+        ) throws(Memory.Error) -> Self {
+            try Self(anonymousLength: length, access: access, sharing: sharing)
         }
     }
 #endif
@@ -360,7 +405,7 @@ extension Memory.Map {
             try access.validate()
 
             let pageSize = Kernel.System.pageSize
-            let mappingLen = Kernel.File.Size(Kernel.System.alignUp(Int(length), to: pageSize))
+            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
 
             let region: Kernel.Memory.Map.Region
             do {
@@ -424,7 +469,7 @@ extension Memory.Map {
             try access.validate()
 
             let pageSize = Kernel.System.pageSize
-            let mappingLen = Kernel.File.Size(Kernel.System.alignUp(Int(length), to: pageSize))
+            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
 
             let baseAddress: Kernel.Memory.Address
             do {

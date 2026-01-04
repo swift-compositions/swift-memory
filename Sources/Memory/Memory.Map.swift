@@ -117,13 +117,13 @@ extension Memory.Map {
     /// The base address for user access (adjusted for offset delta).
     public var baseAddress: UnsafeRawPointer? {
         guard let base = mappingBaseAddress else { return nil }
-        return UnsafeRawPointer(base.advanced(by: Int(offsetDelta)))
+        return UnsafeRawPointer(base.advanced(by: offsetDelta))
     }
 
     /// Mutable base address (only valid if access includes write).
     public var mutableBaseAddress: Kernel.Memory.Address? {
         guard access.allows.write, let base = mappingBaseAddress else { return nil }
-        return base.advanced(by: Int(offsetDelta))
+        return base.advanced(by: offsetDelta)
     }
 
     /// The length of the mapped region visible to the user.
