@@ -25,7 +25,7 @@ extension Memory.Map {
 extension Memory.Map.Test.Unit {
     // MARK: - Anonymous Mapping Tests
 
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("anonymous mapping creates valid region")
     func anonymousMappingCreatesValidRegion() throws {
         let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
@@ -178,7 +178,7 @@ extension Memory.Map.Test.Unit {
 
     // MARK: - Buffer Access Tests (POSIX)
 
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("withUnsafeBytes provides read access")
     func withUnsafeBytesReadAccess() throws {
         let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
@@ -220,7 +220,7 @@ extension Memory.Map.Test.Unit {
 
     // MARK: - File-Backed Mapping Tests (POSIX)
 
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("file-backed mapping reads content")
     func fileBackedMappingReadsContent() throws {
         let content = "Hello, Memory Map!"
@@ -391,7 +391,7 @@ extension Memory.Map.Test.Unit {
 
     // MARK: - Sync Tests
 
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("sync on anonymous mapping")
     func syncAnonymousMapping() throws {
         let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
@@ -434,7 +434,7 @@ extension Memory.Map.Test.Unit {
 
     // MARK: - Protection Tests
 
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("protect changes access")
     func protectChangesAccess() throws {
         var map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
@@ -472,7 +472,7 @@ extension Memory.Map.Test.Unit {
 
     // MARK: - Remap Tests
 
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("remap to new range")
     func remapToNewRange() throws {
         // Create file with 8KB of distinct content
@@ -506,7 +506,7 @@ extension Memory.Map.Test.Unit {
 
     // MARK: - Debug Description
 
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("debug description")
     func debugDescriptionTest() throws {
         let map = try Memory.Map(anonymousLength: 4096)
@@ -524,7 +524,7 @@ extension Memory.Map.Test.Unit {
 // MARK: - Edge Case Tests
 
 extension Memory.Map.Test.EdgeCase {
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("empty file throws size error")
     func emptyFileThrowsSizeError() throws {
         let (path, fd) = try KernelIOTest.createTempFile()
@@ -589,7 +589,7 @@ extension Memory.Map.Test.EdgeCase {
 // MARK: - Performance Tests
 
 extension Memory.Map.Test.Performance {
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("map/unmap cycle", .timed(iterations: 100, warmup: 10))
     func mapUnmapCycle() throws {
         for _ in 0..<10 {

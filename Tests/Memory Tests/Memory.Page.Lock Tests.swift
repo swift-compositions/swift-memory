@@ -31,7 +31,7 @@ extension Memory.Page.Lock.Test.Unit {
         #endif
     }
 
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("lock and unlock memory map")
     func lockAndUnlockMemoryMap() throws {
         let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])

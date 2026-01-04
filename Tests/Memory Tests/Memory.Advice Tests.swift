@@ -21,7 +21,7 @@ extension Memory.Advice {
 
 // MARK: - Unit Tests
 
-#if !os(Windows)
+#if os(macOS) || os(Linux)
 extension Memory.Advice.Test.Unit {
     @Test("sequential advice on mapping")
     func sequentialAdvice() throws {

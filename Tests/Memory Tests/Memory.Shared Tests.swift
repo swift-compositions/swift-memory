@@ -79,7 +79,7 @@ extension Memory.Shared.Test.Unit {
 
     // MARK: - POSIX Shared Memory Tests
 
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("open and unlink shared memory")
     func openAndUnlinkSharedMemory() throws {
         let name = "/swift-memory-test-\(UInt32.random(in: 0..<UInt32.max))"
@@ -213,7 +213,7 @@ extension Memory.Shared.Test.Unit {
 // MARK: - Edge Case Tests
 
 extension Memory.Shared.Test.EdgeCase {
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("unlink non-existent fails")
     func unlinkNonExistentFails() {
         let name = "/swift-memory-test-nonexistent-\(UInt32.random(in: 0..<UInt32.max))"

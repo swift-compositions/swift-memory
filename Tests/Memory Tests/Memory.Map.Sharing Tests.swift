@@ -56,7 +56,7 @@ extension Memory.Map.Sharing.Test.Unit {
         #expect(sharing.kernelFlags == .private)
     }
 
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("anonymous mapping default is private")
     func anonymousMappingDefaultIsPrivate() throws {
         let map = try Memory.Map(anonymousLength: 4096)

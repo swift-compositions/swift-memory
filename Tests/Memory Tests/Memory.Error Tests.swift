@@ -77,7 +77,7 @@ extension Memory.Error.Test.Unit {
         }
     }
 
-    #if !os(Windows)
+    #if os(macOS) || os(Linux)
     @Test("shared error wrapper has description")
     func sharedErrorDescription() {
         let error = Memory.Error.shared(.open(.posix(2)))
