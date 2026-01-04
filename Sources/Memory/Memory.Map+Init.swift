@@ -11,10 +11,6 @@
 
 public import Kernel
 
-#if os(Windows)
-    internal import WinSDK
-#endif
-
 // MARK: - File-backed Initialization (POSIX)
 
 #if !os(Windows)
@@ -52,7 +48,7 @@ public import Kernel
 
             let effectiveSafety = safety ?? (access.allows.write ? .default.write : .default.read)
 
-            let userLen: Int
+            let userLen: Kernel.File.Size
             switch range {
             case .bytes(_, let length):
                 userLen = length
@@ -63,21 +59,26 @@ public import Kernel
                 } catch {
                     throw .stat(error)
                 }
-                userLen = Int(fileStats.size)
-                guard userLen > 0 else {
+                userLen = fileStats.size
+                guard userLen.isPositive else {
                     throw .size
                 }
             }
 
             let requestedOffset = range.offset
             let granularity = Kernel.System.allocationGranularity
-            let alignedOffset = Kernel.System.alignDown(requestedOffset, to: granularity)
-            let delta = requestedOffset - alignedOffset
+            // Align down to granularity boundary
+            let alignedOffset = Kernel.File.Offset(Kernel.System.alignDown(Int(requestedOffset._rawValue), to: granularity))
+            // Delta is always non-negative (alignDown rounds down)
+            let offsetDelta = requestedOffset - alignedOffset
+            let delta = Kernel.File.Size(offsetDelta._rawValue)
+            // Compute total mapping length, aligned up to page size
             let pageSize = Kernel.System.pageSize
-            let mappingLen = Kernel.System.alignUp(userLen + delta, to: pageSize)
+            let totalLength = userLen + delta
+            let mappingLen = Kernel.File.Size(Kernel.System.alignUp(Int(totalLength._rawValue), to: pageSize))
 
             // Phase 2: Acquire resources using helper that handles cleanup
-            let (baseAddress, lockToken) = try Self.acquireResources(
+            let (region, lockToken) = try Self.acquireResources(
                 fileDescriptor: fileDescriptor,
                 alignedOffset: alignedOffset,
                 mappingLen: mappingLen,
@@ -87,8 +88,7 @@ public import Kernel
             )
 
             // Phase 3: Initialize all stored properties (no throws after this point)
-            self.mappingBaseAddress = baseAddress
-            self.mappingLength = mappingLen
+            self.region = region
             self.offsetDelta = delta
             self.userLength = userLen
             self.access = access
@@ -100,25 +100,27 @@ public import Kernel
         /// Acquires mapping and lock resources, handling cleanup on failure.
         private static func acquireResources(
             fileDescriptor: Kernel.Descriptor,
-            alignedOffset: Int,
-            mappingLen: Int,
+            alignedOffset: Kernel.File.Offset,
+            mappingLen: Kernel.File.Size,
             access: Access,
             sharing: Sharing,
             effectiveSafety: Safety
-        ) throws(Memory.Error) -> (UnsafeMutableRawPointer, Memory.Lock.Token?) {
+        ) throws(Memory.Error) -> (Kernel.Memory.Map.Region, Memory.Lock.Token?) {
             // Map the file
-            let baseAddress: UnsafeMutableRawPointer
+            let baseAddress: Kernel.Memory.Address
             do throws(Kernel.Memory.Map.Error) {
                 baseAddress = try Kernel.Memory.Map.map(
-                    length: Kernel.File.Size(mappingLen),
+                    length: mappingLen,
                     protection: access.kernelProtection,
                     flags: sharing.kernelFlags,
                     fd: fileDescriptor,
-                    offset: Kernel.File.Offset(alignedOffset)
+                    offset: alignedOffset
                 )
             } catch {
                 throw Memory.Error(from: error)
             }
+
+            let region = Kernel.Memory.Map.Region(base: baseAddress, length: mappingLen)
 
             // Acquire lock if needed
             let lockToken: Memory.Lock.Token?
@@ -135,14 +137,14 @@ public import Kernel
                         kind: kind
                     )
                 } catch {
-                    try? Kernel.Memory.Map.unmap(addr: baseAddress, length: Kernel.File.Size(mappingLen))
+                    try? Kernel.Memory.Map.unmap(region)
                     throw .lock(error)
                 }
             } else {
                 lockToken = nil
             }
 
-            return (baseAddress, lockToken)
+            return (region, lockToken)
         }
 
     }
@@ -165,17 +167,17 @@ extension Memory.Map {
     ///   boundary.
     static func computeLockRange(
         scope: Safety.Scope,
-        alignedOffset: Int,
-        mappingLength: Int
+        alignedOffset: Kernel.File.Offset,
+        mappingLength: Kernel.File.Size
     ) -> Kernel.Lock.Range {
         switch scope {
         case .file:
             return .file
         case .mapped:
             let granularity = Kernel.System.allocationGranularity
-            let end = alignedOffset + mappingLength
-            let roundedEnd = Kernel.System.alignUp(end, to: granularity)
-            return .bytes(start: Kernel.File.Offset(alignedOffset), end: Kernel.File.Offset(roundedEnd))
+            let endOffset = alignedOffset + mappingLength
+            let roundedEnd = Kernel.File.Offset(Kernel.System.alignUp(Int(endOffset._rawValue), to: granularity))
+            return .bytes(start: alignedOffset, end: roundedEnd)
         }
     }
 }
@@ -211,17 +213,19 @@ extension Memory.Map {
             let effectiveSafety = safety ?? (access.allows.write ? .default.write : .default.read)
 
             // Compute user length
-            let userLen: Int
+            let userLen: Kernel.File.Size
             switch range {
             case .bytes(_, let length):
                 userLen = length
             case .whole:
-                var fileSize = LARGE_INTEGER()
-                guard GetFileSizeEx(fileHandle.rawValue, &fileSize) else {
-                    throw .map(.map(.captureLastError()))
+                let fileStats: Kernel.File.Stats
+                do throws(Kernel.File.Stats.Error) {
+                    fileStats = try Kernel.File.Stats.get(descriptor: fileHandle)
+                } catch {
+                    throw .stat(error)
                 }
-                userLen = Int(fileSize.QuadPart)
-                guard userLen > 0 else {
+                userLen = fileStats.size
+                guard userLen.isPositive else {
                     throw .size
                 }
             }
@@ -229,18 +233,23 @@ extension Memory.Map {
             // Compute alignment
             let requestedOffset = range.offset
             let granularity = Kernel.System.allocationGranularity
-            let alignedOffset = Kernel.System.alignDown(requestedOffset, to: granularity)
-            let delta = requestedOffset - alignedOffset
+            // Align down to granularity boundary
+            let alignedOffset = Kernel.File.Offset(Kernel.System.alignDown(Int(requestedOffset._rawValue), to: granularity))
+            // Delta is always non-negative (alignDown rounds down)
+            let offsetDelta = requestedOffset - alignedOffset
+            let delta = Kernel.File.Size(offsetDelta._rawValue)
+            // Compute total mapping length, aligned up to page size
             let pageSize = Kernel.System.pageSize
-            let mappingLen = Kernel.System.alignUp(userLen + delta, to: pageSize)
+            let totalLength = userLen + delta
+            let mappingLen = Kernel.File.Size(Kernel.System.alignUp(Int(totalLength._rawValue), to: pageSize))
 
             // Map the file
-            let mapping: Kernel.Memory.Map.WindowsMapping
+            let region: Kernel.Memory.Map.Region
             do throws(Kernel.Memory.Map.Error) {
-                mapping = try Kernel.Memory.Map.mapFile(
+                region = try Kernel.Memory.Map.File.map(
                     handle: fileHandle.rawValue,
-                    offset: Int64(alignedOffset),
-                    length: mappingLen,
+                    offset: alignedOffset._rawValue,
+                    length: Int(mappingLen),
                     protection: access.kernelProtection,
                     copyOnWrite: sharing == .private
                 )
@@ -263,7 +272,7 @@ extension Memory.Map {
                         kind: kind
                     )
                 } catch {
-                    try? Kernel.Memory.Map.unmap(mapping)
+                    try? Kernel.Memory.Map.unmap(region)
                     throw .lock(error)
                 }
             } else {
@@ -271,9 +280,7 @@ extension Memory.Map {
             }
 
             return Self(
-                mappingBaseAddress: mapping.baseAddress,
-                mappingLength: mappingLen,
-                mappingHandle: mapping.mappingHandle,
+                region: region,
                 offsetDelta: delta,
                 userLength: userLen,
                 access: access,
@@ -299,19 +306,19 @@ extension Memory.Map {
         ///   - sharing: The sharing mode (default: `.private`).
         /// - Throws: `Memory.Error` if mapping fails.
         public init(
-            anonymousLength length: Int,
+            anonymousLength length: Kernel.File.Size,
             access: Access = [.read, .write],
             sharing: Sharing = .private
         ) throws(Memory.Error) {
             try access.validate()
 
             let pageSize = Kernel.System.pageSize
-            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
+            let mappingLen = Kernel.File.Size(Kernel.System.alignUp(Int(length), to: pageSize))
 
             let region: Kernel.Memory.Map.Region
             do throws(Kernel.Memory.Map.Error) {
                 region = try Kernel.Memory.Map.Anonymous.map(
-                    length: Kernel.File.Size(mappingLen),
+                    length: mappingLen,
                     protection: access.kernelProtection,
                     shared: sharing == .shared
                 )
@@ -319,9 +326,8 @@ extension Memory.Map {
                 throw Memory.Error(from: error)
             }
 
-            self.mappingBaseAddress = region.base
-            self.mappingLength = mappingLen
-            self.offsetDelta = 0
+            self.region = region
+            self.offsetDelta = .zero
             self.userLength = length
             self.access = access
             self.sharing = sharing
@@ -347,18 +353,18 @@ extension Memory.Map {
         /// - Returns: A new anonymous `Region`.
         /// - Throws: `Memory.Error` if mapping fails.
         public static func anonymous(
-            length: Int,
+            length: Kernel.File.Size,
             access: Access = [.read, .write],
             sharing: Sharing = .private
         ) throws(Memory.Error) -> Self {
             try access.validate()
 
             let pageSize = Kernel.System.pageSize
-            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
+            let mappingLen = Kernel.File.Size(Kernel.System.alignUp(Int(length), to: pageSize))
 
-            let mapping: Kernel.Memory.Map.WindowsMapping
+            let region: Kernel.Memory.Map.Region
             do {
-                mapping = try Kernel.Memory.Map.mapAnonymous(
+                region = try Kernel.Memory.Map.Anonymous.map(
                     length: mappingLen,
                     protection: access.kernelProtection
                 )
@@ -367,10 +373,8 @@ extension Memory.Map {
             }
 
             return Self(
-                mappingBaseAddress: mapping.baseAddress,
-                mappingLength: mappingLen,
-                mappingHandle: mapping.mappingHandle,
-                offsetDelta: 0,
+                region: region,
+                offsetDelta: .zero,
                 userLength: length,
                 access: access,
                 sharing: sharing,
@@ -412,17 +416,17 @@ extension Memory.Map {
         /// - Throws: `Memory.Error` if mapping fails.
         public init(
             fileDescriptor: Kernel.Descriptor,
-            mmapOffset: Int64,
-            length: Int,
+            mmapOffset: Kernel.File.Offset,
+            length: Kernel.File.Size,
             access: Access = [.read, .write],
             sharing: Sharing = .shared
         ) throws(Memory.Error) {
             try access.validate()
 
             let pageSize = Kernel.System.pageSize
-            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
+            let mappingLen = Kernel.File.Size(Kernel.System.alignUp(Int(length), to: pageSize))
 
-            let baseAddress: UnsafeMutableRawPointer
+            let baseAddress: Kernel.Memory.Address
             do {
                 baseAddress = try Kernel.Memory.Map.map(
                     length: mappingLen,
@@ -435,9 +439,8 @@ extension Memory.Map {
                 throw Memory.Error(from: error)
             }
 
-            self.mappingBaseAddress = baseAddress
-            self.mappingLength = mappingLen
-            self.offsetDelta = 0
+            self.region = Kernel.Memory.Map.Region(base: baseAddress, length: mappingLen)
+            self.offsetDelta = .zero
             self.userLength = length
             self.access = access
             self.sharing = sharing

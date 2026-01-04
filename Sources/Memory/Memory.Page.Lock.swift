@@ -85,7 +85,7 @@ extension Memory.Page.Lock {
         guard let base = map.baseAddress else {
             throw .unmapped
         }
-        try lock(address: base, size: map.length)
+        try lock(address: base, size: Int(map.length))
     }
 
     /// Unlocks an entire memory mapping.
@@ -96,7 +96,7 @@ extension Memory.Page.Lock {
         guard let base = map.baseAddress else {
             throw .unmapped
         }
-        try unlock(address: base, size: map.length)
+        try unlock(address: base, size: Int(map.length))
     }
 }
 

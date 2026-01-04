@@ -9,6 +9,8 @@
 //
 // ===----------------------------------------------------------------------===//
 
+public import Kernel
+
 extension Memory.Map {
     /// Range specification for mapping.
     public enum Range: Sendable, Equatable {
@@ -17,7 +19,7 @@ extension Memory.Map {
         /// - Parameters:
         ///   - offset: Starting offset in the file (will be aligned down to granularity).
         ///   - length: Number of bytes to map.
-        case bytes(offset: Int, length: Int)
+        case bytes(offset: Kernel.File.Offset, length: Kernel.File.Size)
 
         /// Map the whole file.
         ///
@@ -35,10 +37,10 @@ extension Memory.Map {
 
 extension Memory.Map.Range {
     /// The starting offset.
-    public var offset: Int {
+    public var offset: Kernel.File.Offset {
         switch self {
         case .bytes(let offset, _): return offset
-        case .whole: return 0
+        case .whole: return .zero
         }
     }
 
@@ -46,7 +48,7 @@ extension Memory.Map.Range {
     ///
     /// - Note: For `.whole`, returns nil. The actual length is resolved
     ///         at map time by querying the file.
-    public var length: Int? {
+    public var length: Kernel.File.Size? {
         switch self {
         case .bytes(_, let length): return length
         case .whole: return nil

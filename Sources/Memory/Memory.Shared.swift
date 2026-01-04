@@ -13,14 +13,6 @@ public import Kernel
 
 #if !os(Windows)
 
-#if canImport(Darwin)
-    internal import Darwin
-#elseif canImport(Glibc)
-    internal import Glibc
-#elseif canImport(Musl)
-    internal import Musl
-#endif
-
 extension Memory {
     /// POSIX shared memory operations.
     ///
@@ -56,22 +48,30 @@ extension Memory {
 extension Memory.Shared {
     /// Mode for opening shared memory objects.
     public struct Mode: Sendable, Equatable {
-        /// Raw flags for shm_open.
-        public let flags: Int32
+        /// Access mode (read, write, or both).
+        public let access: Kernel.Memory.Shared.Access
+
+        /// Creation options (create, exclusive, truncate).
+        public let options: Kernel.Memory.Shared.Options
 
         /// Permission mode for creation.
         public let permissions: Kernel.File.Permissions
 
-        public init(flags: Int32, permissions: Kernel.File.Permissions = .ownerReadWrite) {
-            self.flags = flags
+        public init(
+            access: Kernel.Memory.Shared.Access,
+            options: Kernel.Memory.Shared.Options = [],
+            permissions: Kernel.File.Permissions = .ownerReadWrite
+        ) {
+            self.access = access
+            self.options = options
             self.permissions = permissions
         }
 
         /// Open existing read-only.
-        public static let read = Mode(flags: O_RDONLY)
+        public static let read = Mode(access: .read)
 
         /// Open existing read-write.
-        public static let readWrite = Mode(flags: O_RDWR)
+        public static let readWrite = Mode(access: [.read, .write])
 
         /// Nested accessor for create modes.
         public static var create: Create.Type { Create.self }
@@ -85,17 +85,17 @@ extension Memory.Shared.Mode {
     public enum Create {
         /// Create or open read-write.
         public static var readWrite: Memory.Shared.Mode {
-            Memory.Shared.Mode(flags: O_RDWR | O_CREAT)
+            Memory.Shared.Mode(access: [.read, .write], options: .create)
         }
 
         /// Create exclusively (fails if exists).
         public static var exclusive: Memory.Shared.Mode {
-            Memory.Shared.Mode(flags: O_RDWR | O_CREAT | O_EXCL)
+            Memory.Shared.Mode(access: [.read, .write], options: [.create, .exclusive])
         }
 
         /// Create, truncate if exists.
         public static var truncate: Memory.Shared.Mode {
-            Memory.Shared.Mode(flags: O_RDWR | O_CREAT | O_TRUNC)
+            Memory.Shared.Mode(access: [.read, .write], options: [.create, .truncate])
         }
     }
 }
@@ -135,8 +135,9 @@ extension Memory.Shared {
             do throws(Kernel.Memory.Shared.Error) {
                 let fd = try Kernel.Memory.Shared.open(
                     name: namePtr,
-                    flags: mode.flags,
-                    mode: mode_t(mode.permissions.rawValue)
+                    access: mode.access,
+                    options: mode.options,
+                    permissions: mode.permissions
                 )
                 result = .success(fd)
             } catch {

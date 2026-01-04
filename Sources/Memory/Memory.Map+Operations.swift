@@ -21,23 +21,16 @@ extension Memory.Map {
     ///
     /// - Note: This is a consuming function - the region is moved and destroyed.
     public consuming func unmap() {
-        guard let base = mappingBaseAddress else { return }
+        guard let currentRegion = region else { return }
 
         // Release lock token first
         lockToken?.release()
 
         // Unmap the region
-        #if os(Windows)
-            if let handle = mappingHandle {
-                try? Kernel.Memory.Map.unmap(Kernel.Memory.Map.WindowsMapping(baseAddress: base, mappingHandle: handle))
-            }
-            mappingHandle = nil
-        #else
-            try? Kernel.Memory.Map.unmap(addr: base, length: Kernel.File.Size(mappingLength))
-        #endif
+        try? Kernel.Memory.Map.unmap(currentRegion)
 
         // Mark as unmapped so deinit becomes a no-op
-        mappingBaseAddress = nil
+        region = nil
     }
 }
 
@@ -128,7 +121,7 @@ extension Memory.Map {
     /// - Returns: The byte value at that index.
     /// - Precondition: `index` must be in bounds.
     public subscript(index: Int) -> UInt8 {
-        precondition(index >= 0 && index < userLength, "Index out of bounds")
+        precondition(index >= 0 && index < Int(userLength), "Index out of bounds")
         guard let base = baseAddress else {
             preconditionFailure("Mapping is not valid")
         }
@@ -146,7 +139,7 @@ extension Memory.Map {
         guard let base = baseAddress else {
             preconditionFailure("Mapping is not valid")
         }
-        let buffer = UnsafeRawBufferPointer(start: base, count: userLength)
+        let buffer = UnsafeRawBufferPointer(start: base, count: Int(userLength))
         return try body(buffer)
     }
 
@@ -163,7 +156,7 @@ extension Memory.Map {
         guard let base = mutableBaseAddress else {
             preconditionFailure("Mapping is not valid")
         }
-        let buffer = UnsafeMutableRawBufferPointer(start: base, count: userLength)
+        let buffer = UnsafeMutableRawBufferPointer(start: base, count: Int(userLength))
         return try body(buffer)
     }
 
@@ -176,7 +169,7 @@ extension Memory.Map {
     /// - Precondition: `index` must be in bounds.
     public func write(_ value: UInt8, at index: Int) {
         precondition(access.allows.write, "Mapping does not allow writes")
-        precondition(index >= 0 && index < userLength, "Index out of bounds")
+        precondition(index >= 0 && index < Int(userLength), "Index out of bounds")
         guard let base = mutableBaseAddress else {
             preconditionFailure("Mapping is not valid")
         }
@@ -209,7 +202,7 @@ extension Memory.Map {
         do throws(Kernel.Memory.Map.Error) {
             try Kernel.Memory.Map.protect(
                 addr: base,
-                length: Kernel.File.Size(mappingLength),
+                length: mappingLength,
                 protection: newAccess.kernelProtection
             )
             access = newAccess
@@ -234,10 +227,10 @@ extension Memory.Map {
 
         do throws(Kernel.Memory.Map.Error) {
             #if os(Windows)
-                try Kernel.Memory.Map.sync(addr: base, length: Kernel.File.Size(mappingLength))
+                try Kernel.Memory.Map.sync(addr: base, length: mappingLength)
             #else
                 let flags: Kernel.Memory.Map.Sync.Flags = async ? .async : .sync
-                try Kernel.Memory.Map.sync(addr: base, length: Kernel.File.Size(mappingLength), flags: flags)
+                try Kernel.Memory.Map.sync(addr: base, length: mappingLength, flags: flags)
             #endif
         } catch {
             throw Memory.Error(from: error)
@@ -251,7 +244,7 @@ extension Memory.Map {
     /// - Parameter advice: The access pattern hint.
     public func advise(_ advice: Kernel.Memory.Map.Advice) {
         guard let base = mappingBaseAddress else { return }
-        Kernel.Memory.Map.advise(addr: base, length: Kernel.File.Size(mappingLength), advice: advice)
+        Kernel.Memory.Map.advise(addr: base, length: mappingLength, advice: advice)
     }
 }
 

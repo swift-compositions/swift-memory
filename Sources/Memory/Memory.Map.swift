@@ -9,11 +9,7 @@
 //
 // ===----------------------------------------------------------------------===//
 
-internal import Kernel
-
-#if os(Windows)
-    public import WinSDK
-#endif
+public import Kernel
 
 extension Memory {
     /// A move-only memory-mapped file region.
@@ -54,17 +50,16 @@ extension Memory {
     /// let byte = region[0]
     /// ```
     public struct Map: ~Copyable, @unchecked Sendable {
-        /// The base address of the actual OS mapping (granularity-aligned).
-        var mappingBaseAddress: UnsafeMutableRawPointer?
-
-        /// The length of the actual OS mapping.
-        let mappingLength: Int
+        /// The underlying kernel memory region.
+        var region: Kernel.Memory.Map.Region?
 
         /// Delta between user-requested offset and mapping base.
-        let offsetDelta: Int
+        ///
+        /// This is always non-negative (alignment rounds down).
+        let offsetDelta: Kernel.File.Size
 
         /// The user-visible length (requested length).
-        let userLength: Int
+        let userLength: Kernel.File.Size
 
         /// The access mode for this mapping.
         ///
@@ -78,56 +73,34 @@ extension Memory {
         /// The safety mode for this mapping.
         public let safety: Safety
 
-        #if os(Windows)
-            /// Windows file mapping handle (must be closed on unmap).
-            var mappingHandle: HANDLE?
-        #endif
-
         /// Lock token for `.coordinated` safety mode.
         var lockToken: Lock.Token?
 
-        #if os(Windows)
-            /// Internal memberwise initializer for Windows.
-            ///
-            /// This non-throwing init is used by the throwing factory to avoid
-            /// a Swift SIL verification bug on Windows where typed throws +
-            /// ~Copyable + Optional<Class> field causes incorrect destroy_addr
-            /// instructions in error paths.
-            internal init(
-                mappingBaseAddress: UnsafeMutableRawPointer,
-                mappingLength: Int,
-                mappingHandle: HANDLE,
-                offsetDelta: Int,
-                userLength: Int,
-                access: Access,
-                sharing: Sharing,
-                safety: Safety,
-                lockToken: Lock.Token?
-            ) {
-                self.mappingBaseAddress = mappingBaseAddress
-                self.mappingLength = mappingLength
-                self.mappingHandle = mappingHandle
-                self.offsetDelta = offsetDelta
-                self.userLength = userLength
-                self.access = access
-                self.sharing = sharing
-                self.safety = safety
-                self.lockToken = lockToken
-            }
-        #endif
+        /// Internal memberwise initializer.
+        internal init(
+            region: Kernel.Memory.Map.Region?,
+            offsetDelta: Kernel.File.Size,
+            userLength: Kernel.File.Size,
+            access: Access,
+            sharing: Sharing,
+            safety: Safety,
+            lockToken: Lock.Token?
+        ) {
+            self.region = region
+            self.offsetDelta = offsetDelta
+            self.userLength = userLength
+            self.access = access
+            self.sharing = sharing
+            self.safety = safety
+            self.lockToken = lockToken
+        }
 
         deinit {
-            guard let base = mappingBaseAddress else { return }
+            guard let region else { return }
 
             lockToken?.release()
 
-            #if os(Windows)
-                if let handle = mappingHandle {
-                    try? Kernel.Memory.Map.unmap(Kernel.Memory.Map.WindowsMapping(baseAddress: base, mappingHandle: handle))
-                }
-            #else
-                try? Kernel.Memory.Map.unmap(addr: base, length: Kernel.File.Size(mappingLength))
-            #endif
+            try? Kernel.Memory.Map.unmap(region)
         }
     }
 }
@@ -135,21 +108,27 @@ extension Memory {
 // MARK: - Computed Properties
 
 extension Memory.Map {
+    /// The base address of the actual OS mapping (granularity-aligned).
+    var mappingBaseAddress: Kernel.Memory.Address? { region?.base }
+
+    /// The length of the actual OS mapping.
+    var mappingLength: Kernel.File.Size { region?.length ?? .zero }
+
     /// The base address for user access (adjusted for offset delta).
     public var baseAddress: UnsafeRawPointer? {
         guard let base = mappingBaseAddress else { return nil }
-        return UnsafeRawPointer(base.advanced(by: offsetDelta))
+        return UnsafeRawPointer(base.advanced(by: Int(offsetDelta)))
     }
 
     /// Mutable base address (only valid if access includes write).
-    public var mutableBaseAddress: UnsafeMutableRawPointer? {
+    public var mutableBaseAddress: Kernel.Memory.Address? {
         guard access.allows.write, let base = mappingBaseAddress else { return nil }
-        return base.advanced(by: offsetDelta)
+        return base.advanced(by: Int(offsetDelta))
     }
 
     /// The length of the mapped region visible to the user.
-    public var length: Int { userLength }
+    public var length: Kernel.File.Size { userLength }
 
     /// Whether the mapping is still valid.
-    public var isMapped: Bool { mappingBaseAddress != nil }
+    public var isMapped: Bool { region != nil }
 }
