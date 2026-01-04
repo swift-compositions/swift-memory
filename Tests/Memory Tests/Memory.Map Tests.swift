@@ -108,9 +108,75 @@ extension Memory.Map.Test.Unit {
         #expect(isMapped)
         #expect(length == 4096)
     }
+
+    @Test("anonymous mapping read/write (Windows)")
+    func anonymousMappingReadWriteWindows() throws {
+        let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
+
+        map.write(42, at: 0)
+        map.write(123, at: 100)
+
+        let byte0 = map[0]
+        let byte100 = map[100]
+
+        map.unmap()
+
+        #expect(byte0 == 42)
+        #expect(byte100 == 123)
+    }
+
+    @Test("withUnsafeBytes read access (Windows)")
+    func withUnsafeBytesReadAccessWindows() throws {
+        let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
+
+        map.write(1, at: 0)
+        map.write(2, at: 1)
+        map.write(3, at: 2)
+
+        let sum = map.withUnsafeBytes { buffer -> Int in
+            Int(buffer[0]) + Int(buffer[1]) + Int(buffer[2])
+        }
+
+        map.unmap()
+
+        #expect(sum == 6)
+    }
+
+    @Test("withUnsafeMutableBytes write access (Windows)")
+    func withUnsafeMutableBytesWriteAccessWindows() throws {
+        let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
+
+        map.withUnsafeMutableBytes { buffer in
+            buffer[0] = 10
+            buffer[1] = 20
+            buffer[2] = 30
+        }
+
+        let byte0 = map[0]
+        let byte1 = map[1]
+        let byte2 = map[2]
+
+        map.unmap()
+
+        #expect(byte0 == 10)
+        #expect(byte1 == 20)
+        #expect(byte2 == 30)
+    }
+
+    @Test("debug description (Windows)")
+    func debugDescriptionTestWindows() throws {
+        let map = try Memory.Map.anonymous(length: 4096)
+
+        let description = map.debugDescription
+
+        map.unmap()
+
+        #expect(description.contains("mapped"))
+        #expect(description.contains("4096"))
+    }
     #endif
 
-    // MARK: - Buffer Access Tests
+    // MARK: - Buffer Access Tests (POSIX)
 
     #if !os(Windows)
     @Test("withUnsafeBytes provides read access")
@@ -286,6 +352,40 @@ extension Memory.Map.Test.Unit {
         KernelIOTest.cleanupTempFile(path: path, fd: fd)
 
         #expect(length == 1024)
+    }
+    #endif
+
+    // MARK: - Linux-specific io_uring Offset Mapping
+
+    #if os(Linux)
+    @Test("mmap offset mapping for io_uring-style APIs")
+    func mmapOffsetMappingForIoUring() throws {
+        // This tests the special init that takes an explicit mmap offset
+        // Used for io_uring ring buffer mappings where offset is not a file offset
+        // but a magic value that selects a specific region.
+        //
+        // We can't test with actual io_uring here, but we can test the API
+        // works for regular file offsets (which is a subset of the functionality).
+        let content = String(repeating: "X", count: 8192)
+        let (path, fd) = try KernelIOTest.createTempFileWithContent(content)
+
+        // Use mmap offset init with explicit offset (equivalent to regular mapping)
+        let map = try Memory.Map(
+            fileDescriptor: fd,
+            mmapOffset: Kernel.File.Offset(4096),
+            length: 4096,
+            access: .read,
+            sharing: .shared
+        )
+
+        let isMapped = map.isMapped
+        let length = map.length
+
+        map.unmap()
+        KernelIOTest.cleanupTempFile(path: path, fd: fd)
+
+        #expect(isMapped)
+        #expect(length == 4096)
     }
     #endif
 
@@ -465,6 +565,25 @@ extension Memory.Map.Test.EdgeCase {
     // the map, the compiler prevents any further access - making these
     // error conditions impossible at runtime.
     #endif
+
+    #if os(Windows)
+    @Test("write-only access throws (Windows)")
+    func writeOnlyAccessThrowsWindows() throws {
+        #expect(throws: Memory.Error.self) {
+            _ = try Memory.Map.anonymous(length: 4096, access: .write)
+        }
+    }
+
+    @Test("unmap consumes mapping (Windows)")
+    func unmapConsumesMappingWindows() throws {
+        let map = try Memory.Map.anonymous(length: 4096)
+        let wasMapped = map.isMapped
+
+        map.unmap()
+
+        #expect(wasMapped)
+    }
+    #endif
 }
 
 // MARK: - Performance Tests
@@ -482,6 +601,29 @@ extension Memory.Map.Test.Performance {
     @Test("sequential write throughput", .timed(iterations: 10, warmup: 2))
     func sequentialWriteThroughput() throws {
         let map = try Memory.Map(anonymousLength: 65536, access: [.read, .write])
+
+        map.withUnsafeMutableBytes { buffer in
+            for i in 0..<buffer.count {
+                buffer[i] = UInt8(truncatingIfNeeded: i)
+            }
+        }
+
+        map.unmap()
+    }
+    #endif
+
+    #if os(Windows)
+    @Test("map/unmap cycle (Windows)", .timed(iterations: 100, warmup: 10))
+    func mapUnmapCycleWindows() throws {
+        for _ in 0..<10 {
+            let map = try Memory.Map.anonymous(length: 4096)
+            map.unmap()
+        }
+    }
+
+    @Test("sequential write throughput (Windows)", .timed(iterations: 10, warmup: 2))
+    func sequentialWriteThroughputWindows() throws {
+        let map = try Memory.Map.anonymous(length: 65536, access: [.read, .write])
 
         map.withUnsafeMutableBytes { buffer in
             for i in 0..<buffer.count {

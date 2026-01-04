@@ -185,6 +185,28 @@ extension Memory.Shared.Test.Unit {
         try Memory.Shared.close(shm)
         // Should not throw
     }
+
+    @Test("open existing shared memory (Windows)")
+    func openExistingSharedMemoryWindows() throws {
+        let name = "Local\\swift-memory-test-open-\(UInt32.random(in: 0..<UInt32.max))"
+
+        // Create with size
+        let shm1 = try Memory.Shared.open(
+            name: name,
+            size: 4096,
+            mode: .create.readWrite
+        )
+
+        // Open existing (without size, uses open(name:mode:))
+        let shm2 = try Memory.Shared.open(name: name, mode: .readWrite)
+
+        // Both should be valid
+        #expect(shm1.rawValue != nil)
+        #expect(shm2.rawValue != nil)
+
+        try Memory.Shared.close(shm2)
+        try Memory.Shared.close(shm1)
+    }
     #endif
 }
 
@@ -204,6 +226,17 @@ extension Memory.Shared.Test.EdgeCase {
     @Test("open non-existent read-only fails")
     func openNonExistentReadOnlyFails() {
         let name = "/swift-memory-test-nonexistent-\(UInt32.random(in: 0..<UInt32.max))"
+
+        #expect(throws: Memory.Error.self) {
+            _ = try Memory.Shared.open(name: name, mode: .read)
+        }
+    }
+    #endif
+
+    #if os(Windows)
+    @Test("open non-existent fails (Windows)")
+    func openNonExistentFailsWindows() {
+        let name = "Local\\swift-memory-test-nonexistent-\(UInt32.random(in: 0..<UInt32.max))"
 
         #expect(throws: Memory.Error.self) {
             _ = try Memory.Shared.open(name: name, mode: .read)

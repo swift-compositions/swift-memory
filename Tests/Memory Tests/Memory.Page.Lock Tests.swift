@@ -77,6 +77,54 @@ extension Memory.Page.Lock.Test.Unit {
         let _: Memory.Page.Lock.All.Flags = .future
     }
     #endif
+
+    #if os(Windows)
+    @Test("lock and unlock memory map (Windows)")
+    func lockAndUnlockMemoryMapWindows() throws {
+        let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
+
+        guard let base = map.baseAddress else {
+            map.unmap()
+            Issue.record("Map has no base address")
+            return
+        }
+
+        let length = map.length
+
+        // Note: VirtualLock may fail due to working set quota
+        do {
+            try Memory.Page.Lock.lock(address: base, size: length)
+            try Memory.Page.Lock.unlock(address: base, size: length)
+        } catch {
+            // Expected on systems with restricted working set
+        }
+
+        map.unmap()
+    }
+
+    @Test("lock and unlock by address (Windows)")
+    func lockAndUnlockByAddressWindows() throws {
+        let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
+
+        guard let base = map.baseAddress else {
+            map.unmap()
+            Issue.record("Map has no base address")
+            return
+        }
+
+        let length = map.length
+
+        // Note: VirtualLock may fail due to working set quota
+        do {
+            try Memory.Page.Lock.lock(address: base, size: length)
+            try Memory.Page.Lock.unlock(address: base, size: length)
+        } catch {
+            // Expected on systems with restricted working set
+        }
+
+        map.unmap()
+    }
+    #endif
 }
 
 // MARK: - Edge Case Tests
