@@ -78,22 +78,22 @@ extension Memory.Error.Test.Unit {
     }
 
     #if os(macOS) || os(Linux)
-    @Test("shared error wrapper has description")
-    func sharedErrorDescription() {
-        let error = Memory.Error.shared(.open(.posix(2)))
-        #expect(!error.description.isEmpty)
-    }
-
-    @Test("convenience init from shared error")
-    func convenienceInitFromSharedError() {
-        let kernelError = Kernel.Memory.Shared.Error.open(.posix(2))
-        let error = Memory.Error(from: kernelError)
-        if case .shared = error {
-            // Correct case
-        } else {
-            Issue.record("Expected .shared case")
+        @Test("shared error wrapper has description")
+        func sharedErrorDescription() {
+            let error = Memory.Error.shared(.open(.posix(2)))
+            #expect(!error.description.isEmpty)
         }
-    }
+
+        @Test("convenience init from shared error")
+        func convenienceInitFromSharedError() {
+            let kernelError = Kernel.Memory.Shared.Error.open(.posix(2))
+            let error = Memory.Error(from: kernelError)
+            if case .shared = error {
+                // Correct case
+            } else {
+                Issue.record("Expected .shared case")
+            }
+        }
     #endif
 }
 

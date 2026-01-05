@@ -46,29 +46,29 @@ extension Memory.Map.Sharing.Test.Unit {
     // Kernel.Memory.Map.Sharing conversions are tested in swift-kernel
 
     #if os(macOS) || os(Linux)
-    @Test("anonymous mapping default is private")
-    func anonymousMappingDefaultIsPrivate() throws {
-        let map = try Memory.Map(anonymousLength: 4096)
-        let sharing = map.sharing
-        map.unmap()
-        #expect(sharing == .private)
-    }
+        @Test("anonymous mapping default is private")
+        func anonymousMappingDefaultIsPrivate() throws {
+            let map = try Memory.Map(anonymousLength: 4096)
+            let sharing = map.sharing
+            map.unmap()
+            #expect(sharing == .private)
+        }
 
-    @Test("anonymous mapping with shared")
-    func anonymousMappingWithShared() throws {
-        let map = try Memory.Map(anonymousLength: 4096, sharing: .shared)
-        let sharing = map.sharing
-        map.unmap()
-        #expect(sharing == .shared)
-    }
+        @Test("anonymous mapping with shared")
+        func anonymousMappingWithShared() throws {
+            let map = try Memory.Map(anonymousLength: 4096, sharing: .shared)
+            let sharing = map.sharing
+            map.unmap()
+            #expect(sharing == .shared)
+        }
 
-    @Test("anonymous mapping with private")
-    func anonymousMappingWithPrivate() throws {
-        let map = try Memory.Map(anonymousLength: 4096, sharing: .private)
-        let sharing = map.sharing
-        map.unmap()
-        #expect(sharing == .private)
-    }
+        @Test("anonymous mapping with private")
+        func anonymousMappingWithPrivate() throws {
+            let map = try Memory.Map(anonymousLength: 4096, sharing: .private)
+            let sharing = map.sharing
+            map.unmap()
+            #expect(sharing == .private)
+        }
     #endif
 }
 

@@ -142,77 +142,77 @@ extension Memory.Shared.Mode {
 
 #if !os(Windows)
 
-extension Memory.Shared {
-    /// Opens or creates a POSIX shared memory object.
-    ///
-    /// - Parameters:
-    ///   - name: The name of the shared memory object (must start with '/').
-    ///   - mode: The open mode and permissions.
-    /// - Returns: A file descriptor for the shared memory object.
-    /// - Throws: `Memory.Error` if the operation fails.
-    ///
-    /// ## Name Requirements
-    ///
-    /// The name must:
-    /// - Start with a forward slash ('/')
-    /// - Not contain additional slashes
-    /// - Not exceed `NAME_MAX` characters (typically 255)
-    ///
-    /// ## Example
-    ///
-    /// ```swift
-    /// let shm = try Memory.Shared.open(
-    ///     name: "/my-ipc-buffer",
-    ///     mode: .create.exclusive
-    /// )
-    /// ```
-    public static func open(
-        name: String,
-        mode: Mode
-    ) throws(Memory.Error) -> Kernel.Descriptor {
-        var result: Result<Kernel.Descriptor, Kernel.Memory.Shared.Error>!
-        name.withCString { namePtr in
-            do throws(Kernel.Memory.Shared.Error) {
-                let fd = try Kernel.Memory.Shared.open(
-                    name: namePtr,
-                    access: mode.access,
-                    options: mode.options,
-                    permissions: mode.permissions
-                )
-                result = .success(fd)
-            } catch {
-                result = .failure(error)
+    extension Memory.Shared {
+        /// Opens or creates a POSIX shared memory object.
+        ///
+        /// - Parameters:
+        ///   - name: The name of the shared memory object (must start with '/').
+        ///   - mode: The open mode and permissions.
+        /// - Returns: A file descriptor for the shared memory object.
+        /// - Throws: `Memory.Error` if the operation fails.
+        ///
+        /// ## Name Requirements
+        ///
+        /// The name must:
+        /// - Start with a forward slash ('/')
+        /// - Not contain additional slashes
+        /// - Not exceed `NAME_MAX` characters (typically 255)
+        ///
+        /// ## Example
+        ///
+        /// ```swift
+        /// let shm = try Memory.Shared.open(
+        ///     name: "/my-ipc-buffer",
+        ///     mode: .create.exclusive
+        /// )
+        /// ```
+        public static func open(
+            name: String,
+            mode: Mode
+        ) throws(Memory.Error) -> Kernel.Descriptor {
+            var result: Result<Kernel.Descriptor, Kernel.Memory.Shared.Error>!
+            name.withCString { namePtr in
+                do throws(Kernel.Memory.Shared.Error) {
+                    let fd = try Kernel.Memory.Shared.open(
+                        name: namePtr,
+                        access: mode.access,
+                        options: mode.options,
+                        permissions: mode.permissions
+                    )
+                    result = .success(fd)
+                } catch {
+                    result = .failure(error)
+                }
+            }
+            switch result! {
+            case .success(let fd):
+                return fd
+            case .failure(let error):
+                throw Memory.Error(from: error)
             }
         }
-        switch result! {
-        case .success(let fd):
-            return fd
-        case .failure(let error):
-            throw Memory.Error(from: error)
-        }
-    }
 
-    /// Removes a POSIX shared memory object.
-    ///
-    /// The shared memory object is unlinked from the filesystem namespace.
-    /// Existing mappings remain valid until all processes unmap them.
-    ///
-    /// - Parameter name: The name of the shared memory object to remove.
-    /// - Throws: `Memory.Error` if the operation fails.
-    public static func unlink(name: String) throws(Memory.Error) {
-        var unlinkError: Kernel.Memory.Shared.Error?
-        name.withCString { namePtr in
-            do throws(Kernel.Memory.Shared.Error) {
-                try Kernel.Memory.Shared.unlink(name: namePtr)
-            } catch {
-                unlinkError = error
+        /// Removes a POSIX shared memory object.
+        ///
+        /// The shared memory object is unlinked from the filesystem namespace.
+        /// Existing mappings remain valid until all processes unmap them.
+        ///
+        /// - Parameter name: The name of the shared memory object to remove.
+        /// - Throws: `Memory.Error` if the operation fails.
+        public static func unlink(name: String) throws(Memory.Error) {
+            var unlinkError: Kernel.Memory.Shared.Error?
+            name.withCString { namePtr in
+                do throws(Kernel.Memory.Shared.Error) {
+                    try Kernel.Memory.Shared.unlink(name: namePtr)
+                } catch {
+                    unlinkError = error
+                }
+            }
+            if let unlinkError {
+                throw Memory.Error(from: unlinkError)
             }
         }
-        if let unlinkError {
-            throw Memory.Error(from: unlinkError)
-        }
     }
-}
 
 #endif
 
@@ -220,87 +220,87 @@ extension Memory.Shared {
 
 #if os(Windows)
 
-extension Memory.Shared {
-    /// Creates or opens a named shared memory object on Windows.
-    ///
-    /// - Parameters:
-    ///   - name: The name of the shared memory object.
-    ///     Use "Local\\" prefix for session-local or "Global\\" for system-wide.
-    ///   - size: The size of the shared memory region (required on Windows).
-    ///   - mode: The open mode.
-    /// - Returns: A descriptor for the shared memory object.
-    /// - Throws: `Memory.Error` if the operation fails.
-    ///
-    /// ## Name Format
-    ///
-    /// Unlike POSIX, Windows names don't require a "/" prefix:
-    /// - `"Local\\my-buffer"` - visible only in current session
-    /// - `"Global\\my-buffer"` - visible system-wide (requires privileges)
-    ///
-    /// ## Example
-    ///
-    /// ```swift
-    /// let shm = try Memory.Shared.open(
-    ///     name: "Local\\my-ipc-buffer",
-    ///     size: 4096,
-    ///     mode: .create.exclusive
-    /// )
-    /// ```
-    public static func open(
-        name: String,
-        size: Kernel.File.Size,
-        mode: Mode
-    ) throws(Memory.Error) -> Kernel.Descriptor {
-        do throws(Kernel.Memory.Shared.Error) {
-            return try Kernel.Memory.Shared.open(
-                name: name,
-                size: size,
-                access: mode.access,
-                options: mode.options
-            )
-        } catch {
-            throw Memory.Error(from: error)
+    extension Memory.Shared {
+        /// Creates or opens a named shared memory object on Windows.
+        ///
+        /// - Parameters:
+        ///   - name: The name of the shared memory object.
+        ///     Use "Local\\" prefix for session-local or "Global\\" for system-wide.
+        ///   - size: The size of the shared memory region (required on Windows).
+        ///   - mode: The open mode.
+        /// - Returns: A descriptor for the shared memory object.
+        /// - Throws: `Memory.Error` if the operation fails.
+        ///
+        /// ## Name Format
+        ///
+        /// Unlike POSIX, Windows names don't require a "/" prefix:
+        /// - `"Local\\my-buffer"` - visible only in current session
+        /// - `"Global\\my-buffer"` - visible system-wide (requires privileges)
+        ///
+        /// ## Example
+        ///
+        /// ```swift
+        /// let shm = try Memory.Shared.open(
+        ///     name: "Local\\my-ipc-buffer",
+        ///     size: 4096,
+        ///     mode: .create.exclusive
+        /// )
+        /// ```
+        public static func open(
+            name: String,
+            size: Kernel.File.Size,
+            mode: Mode
+        ) throws(Memory.Error) -> Kernel.Descriptor {
+            do throws(Kernel.Memory.Shared.Error) {
+                return try Kernel.Memory.Shared.open(
+                    name: name,
+                    size: size,
+                    access: mode.access,
+                    options: mode.options
+                )
+            } catch {
+                throw Memory.Error(from: error)
+            }
         }
-    }
 
-    /// Opens an existing named shared memory object on Windows.
-    ///
-    /// - Parameters:
-    ///   - name: The name of the shared memory object.
-    ///   - mode: The open mode (only access is used; options ignored).
-    /// - Returns: A descriptor for the shared memory object.
-    /// - Throws: `Memory.Error` if the operation fails.
-    public static func open(
-        name: String,
-        mode: Mode
-    ) throws(Memory.Error) -> Kernel.Descriptor {
-        do throws(Kernel.Memory.Shared.Error) {
-            return try Kernel.Memory.Shared.open(
-                name: name,
-                access: mode.access
-            )
-        } catch {
-            throw Memory.Error(from: error)
+        /// Opens an existing named shared memory object on Windows.
+        ///
+        /// - Parameters:
+        ///   - name: The name of the shared memory object.
+        ///   - mode: The open mode (only access is used; options ignored).
+        /// - Returns: A descriptor for the shared memory object.
+        /// - Throws: `Memory.Error` if the operation fails.
+        public static func open(
+            name: String,
+            mode: Mode
+        ) throws(Memory.Error) -> Kernel.Descriptor {
+            do throws(Kernel.Memory.Shared.Error) {
+                return try Kernel.Memory.Shared.open(
+                    name: name,
+                    access: mode.access
+                )
+            } catch {
+                throw Memory.Error(from: error)
+            }
         }
-    }
 
-    /// Closes a shared memory object handle.
-    ///
-    /// On Windows, shared memory objects are reference-counted.
-    /// The object is deleted when all handles are closed.
-    ///
-    /// - Note: This is different from POSIX where `unlink` removes the name
-    ///   but the object persists until all mappings are unmapped.
-    ///
-    /// - Parameter descriptor: The descriptor to close.
-    /// - Throws: `Memory.Error` if the operation fails.
-    public static func close(_ descriptor: Kernel.Descriptor) throws(Memory.Error) {
-        do throws(Kernel.Memory.Shared.Error) {
-            try Kernel.Memory.Shared.close(descriptor)
-        } catch {
-            throw Memory.Error(from: error)
+        /// Closes a shared memory object handle.
+        ///
+        /// On Windows, shared memory objects are reference-counted.
+        /// The object is deleted when all handles are closed.
+        ///
+        /// - Note: This is different from POSIX where `unlink` removes the name
+        ///   but the object persists until all mappings are unmapped.
+        ///
+        /// - Parameter descriptor: The descriptor to close.
+        /// - Throws: `Memory.Error` if the operation fails.
+        public static func close(_ descriptor: Kernel.Descriptor) throws(Memory.Error) {
+            do throws(Kernel.Memory.Shared.Error) {
+                try Kernel.Memory.Shared.close(descriptor)
+            } catch {
+                throw Memory.Error(from: error)
+            }
         }
     }
-}
 
 #endif

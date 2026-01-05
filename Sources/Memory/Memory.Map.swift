@@ -96,25 +96,6 @@ extension Memory {
         /// Lock token for `.coordinated` safety mode.
         var lockToken: Lock.Token?
 
-        /// Internal memberwise initializer.
-        internal init(
-            region: Kernel.Memory.Map.Region?,
-            offsetDelta: Kernel.File.Size,
-            userLength: Kernel.File.Size,
-            access: Access,
-            sharing: Sharing,
-            safety: Safety,
-            lockToken: Lock.Token?
-        ) {
-            self.region = region
-            self.offsetDelta = offsetDelta
-            self.userLength = userLength
-            self.access = access
-            self.sharing = sharing
-            self.safety = safety
-            self.lockToken = lockToken
-        }
-
         deinit {
             guard let region else { return }
 

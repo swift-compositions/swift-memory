@@ -75,9 +75,9 @@ extension Memory.Page.Lock {
         /// ```
         public static var isSupported: Bool {
             #if os(Windows)
-            return false
+                return false
             #else
-            return true
+                return true
             #endif
         }
     }
@@ -144,45 +144,45 @@ extension Memory.Page.Lock {
 // MARK: - Lock All (POSIX only)
 
 #if !os(Windows)
-extension Memory.Page.Lock.All {
-    /// Flags for locking all pages.
-    public typealias Flags = Kernel.Memory.Lock.All.Flags
+    extension Memory.Page.Lock.All {
+        /// Flags for locking all pages.
+        public typealias Flags = Kernel.Memory.Lock.All.Flags
 
-    /// Locks all current and/or future pages in the process address space.
-    ///
-    /// - Parameter flags: Which pages to lock.
-    /// - Throws: `Memory.Error` if locking fails.
-    ///
-    /// ## Flags
-    ///
-    /// - `.current`: Lock all pages currently mapped
-    /// - `.future`: Lock pages mapped in the future
-    /// - `.onFault` (Linux only): Lock pages when they are faulted in
-    ///
-    /// ## Example
-    ///
-    /// ```swift
-    /// // Lock all current and future pages
-    /// try Memory.Page.Lock.all.lock(.current | .future)
-    /// defer { try? Memory.Page.Lock.all.unlock() }
-    /// ```
-    public static func lock(_ flags: Flags) throws(Memory.Error) {
-        do throws(Kernel.Memory.Lock.Error) {
-            try Kernel.Memory.Lock.lockAll(flags)
-        } catch {
-            throw Memory.Error(from: error)
+        /// Locks all current and/or future pages in the process address space.
+        ///
+        /// - Parameter flags: Which pages to lock.
+        /// - Throws: `Memory.Error` if locking fails.
+        ///
+        /// ## Flags
+        ///
+        /// - `.current`: Lock all pages currently mapped
+        /// - `.future`: Lock pages mapped in the future
+        /// - `.onFault` (Linux only): Lock pages when they are faulted in
+        ///
+        /// ## Example
+        ///
+        /// ```swift
+        /// // Lock all current and future pages
+        /// try Memory.Page.Lock.all.lock(.current | .future)
+        /// defer { try? Memory.Page.Lock.all.unlock() }
+        /// ```
+        public static func lock(_ flags: Flags) throws(Memory.Error) {
+            do throws(Kernel.Memory.Lock.Error) {
+                try Kernel.Memory.Lock.lockAll(flags)
+            } catch {
+                throw Memory.Error(from: error)
+            }
+        }
+
+        /// Unlocks all pages in the process address space.
+        ///
+        /// - Throws: `Memory.Error` if unlocking fails.
+        public static func unlock() throws(Memory.Error) {
+            do throws(Kernel.Memory.Lock.Error) {
+                try Kernel.Memory.Lock.unlockAll()
+            } catch {
+                throw Memory.Error(from: error)
+            }
         }
     }
-
-    /// Unlocks all pages in the process address space.
-    ///
-    /// - Throws: `Memory.Error` if unlocking fails.
-    public static func unlock() throws(Memory.Error) {
-        do throws(Kernel.Memory.Lock.Error) {
-            try Kernel.Memory.Lock.unlockAll()
-        } catch {
-            throw Memory.Error(from: error)
-        }
-    }
-}
 #endif

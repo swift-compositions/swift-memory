@@ -35,7 +35,7 @@ extension Memory {
 
         /// Shared memory operation failed.
         #if !os(Windows)
-        case shared(Kernel.Memory.Shared.Error)
+            case shared(Kernel.Memory.Shared.Error)
         #endif
 
         /// Page locking operation failed.
@@ -63,8 +63,8 @@ extension Memory.Error: CustomStringConvertible {
         case .map(let error):
             return "Memory map: \(error)"
         #if !os(Windows)
-        case .shared(let error):
-            return "Shared memory: \(error)"
+            case .shared(let error):
+                return "Shared memory: \(error)"
         #endif
         case .page(let error):
             return "Page lock: \(error)"
@@ -86,11 +86,11 @@ extension Memory.Error {
     }
 
     #if !os(Windows)
-    /// Creates an error from a Kernel.Memory.Shared.Error.
-    @inlinable
-    public init(from error: Kernel.Memory.Shared.Error) {
-        self = .shared(error)
-    }
+        /// Creates an error from a Kernel.Memory.Shared.Error.
+        @inlinable
+        public init(from error: Kernel.Memory.Shared.Error) {
+            self = .shared(error)
+        }
     #endif
 
     /// Creates an error from a Kernel.Memory.Lock.Error.

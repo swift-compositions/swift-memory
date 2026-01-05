@@ -24,98 +24,98 @@ extension Memory.Page.Lock.Test.Unit {
     // Platform capabilities (isProcessWideLockingSupported) are tested in swift-kernel
 
     #if os(macOS) || os(Linux)
-    @Test("lock and unlock memory map")
-    func lockAndUnlockMemoryMap() throws {
-        let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
+        @Test("lock and unlock memory map")
+        func lockAndUnlockMemoryMap() throws {
+            let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
 
-        // Note: This may fail on macOS without entitlement or on Linux with low RLIMIT_MEMLOCK
-        do {
-            try Memory.Page.Lock.lock(map)
-            try Memory.Page.Lock.unlock(map)
-        } catch {
-            // Expected on systems with restricted mlock
-        }
+            // Note: This may fail on macOS without entitlement or on Linux with low RLIMIT_MEMLOCK
+            do {
+                try Memory.Page.Lock.lock(map)
+                try Memory.Page.Lock.unlock(map)
+            } catch {
+                // Expected on systems with restricted mlock
+            }
 
-        map.unmap()
-    }
-
-    @Test("lock and unlock by address")
-    func lockAndUnlockByAddress() throws {
-        let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
-
-        guard let base = map.baseAddress else {
             map.unmap()
-            Issue.record("Map has no base address")
-            return
         }
 
-        let length = map.length
+        @Test("lock and unlock by address")
+        func lockAndUnlockByAddress() throws {
+            let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
 
-        // Note: This may fail on macOS without entitlement
-        do {
-            try Memory.Page.Lock.lock(address: base, size: length)
-            try Memory.Page.Lock.unlock(address: base, size: length)
-        } catch {
-            // Expected on systems with restricted mlock
+            guard let base = map.baseAddress else {
+                map.unmap()
+                Issue.record("Map has no base address")
+                return
+            }
+
+            let length = map.length
+
+            // Note: This may fail on macOS without entitlement
+            do {
+                try Memory.Page.Lock.lock(address: base, size: length)
+                try Memory.Page.Lock.unlock(address: base, size: length)
+            } catch {
+                // Expected on systems with restricted mlock
+            }
+
+            map.unmap()
         }
 
-        map.unmap()
-    }
-
-    @Test("lock all flags are accessible")
-    func lockAllFlagsAccessible() {
-        // Just verify the types are accessible
-        let _: Memory.Page.Lock.All.Flags = .current
-        let _: Memory.Page.Lock.All.Flags = .future
-    }
+        @Test("lock all flags are accessible")
+        func lockAllFlagsAccessible() {
+            // Just verify the types are accessible
+            let _: Memory.Page.Lock.All.Flags = .current
+            let _: Memory.Page.Lock.All.Flags = .future
+        }
     #endif
 
     #if os(Windows)
-    @Test("lock and unlock memory map (Windows)")
-    func lockAndUnlockMemoryMapWindows() throws {
-        let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
+        @Test("lock and unlock memory map (Windows)")
+        func lockAndUnlockMemoryMapWindows() throws {
+            let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
 
-        guard let base = map.baseAddress else {
+            guard let base = map.baseAddress else {
+                map.unmap()
+                Issue.record("Map has no base address")
+                return
+            }
+
+            let length = map.length
+
+            // Note: VirtualLock may fail due to working set quota
+            do {
+                try Memory.Page.Lock.lock(address: base, size: length)
+                try Memory.Page.Lock.unlock(address: base, size: length)
+            } catch {
+                // Expected on systems with restricted working set
+            }
+
             map.unmap()
-            Issue.record("Map has no base address")
-            return
         }
 
-        let length = map.length
+        @Test("lock and unlock by address (Windows)")
+        func lockAndUnlockByAddressWindows() throws {
+            let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
 
-        // Note: VirtualLock may fail due to working set quota
-        do {
-            try Memory.Page.Lock.lock(address: base, size: length)
-            try Memory.Page.Lock.unlock(address: base, size: length)
-        } catch {
-            // Expected on systems with restricted working set
-        }
+            guard let base = map.baseAddress else {
+                map.unmap()
+                Issue.record("Map has no base address")
+                return
+            }
 
-        map.unmap()
-    }
+            let length = map.length
 
-    @Test("lock and unlock by address (Windows)")
-    func lockAndUnlockByAddressWindows() throws {
-        let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
+            // Note: VirtualLock may fail due to working set quota
+            do {
+                try Memory.Page.Lock.lock(address: base, size: length)
+                try Memory.Page.Lock.unlock(address: base, size: length)
+            } catch {
+                // Expected on systems with restricted working set
+            }
 
-        guard let base = map.baseAddress else {
             map.unmap()
-            Issue.record("Map has no base address")
-            return
         }
-
-        let length = map.length
-
-        // Note: VirtualLock may fail due to working set quota
-        do {
-            try Memory.Page.Lock.lock(address: base, size: length)
-            try Memory.Page.Lock.unlock(address: base, size: length)
-        } catch {
-            // Expected on systems with restricted working set
-        }
-
-        map.unmap()
-    }
     #endif
 }
 

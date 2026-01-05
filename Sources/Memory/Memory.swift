@@ -55,8 +55,8 @@ extension Memory.Page {
     /// The page size as a `Binary.Alignment` for alignment operations.
     @inlinable
     public static var alignment: Binary.Alignment {
-        // Safe: page size is always a power of 2
-        try! Binary.Alignment(Int(size))
+        // swiftlint:disable:next force_try
+        try! Binary.Alignment(Int(size))  // Safe: page size is always a power of 2
     }
 
     /// Nested accessor for alignment operations.
@@ -108,8 +108,8 @@ extension Memory.Allocation {
     /// The allocation granularity as a `Binary.Alignment` for alignment operations.
     @inlinable
     public static var alignment: Binary.Alignment {
-        // Safe: allocation granularity is always a power of 2
-        try! Binary.Alignment(Int(granularity))
+        // swiftlint:disable:next force_try
+        try! Binary.Alignment(Int(granularity))  // Safe: allocation granularity is always a power of 2
     }
 
     /// Nested accessor for alignment operations.
