@@ -45,8 +45,8 @@ extension Memory.Map.Test.Unit {
     func anonymousMappingReadWrite() throws {
         let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
 
-        map.write(42, at: 0)
-        map.write(123, at: 100)
+        map[0] = 42
+        map[100] = 123
 
         let byte0 = map[0]
         let byte100 = map[100]
@@ -113,8 +113,8 @@ extension Memory.Map.Test.Unit {
     func anonymousMappingReadWriteWindows() throws {
         let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
 
-        map.write(42, at: 0)
-        map.write(123, at: 100)
+        map[0] = 42
+        map[100] = 123
 
         let byte0 = map[0]
         let byte100 = map[100]
@@ -129,9 +129,9 @@ extension Memory.Map.Test.Unit {
     func withUnsafeBytesReadAccessWindows() throws {
         let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
 
-        map.write(1, at: 0)
-        map.write(2, at: 1)
-        map.write(3, at: 2)
+        map[0] = 1
+        map[1] = 2
+        map[2] = 3
 
         let sum = map.withUnsafeBytes { buffer -> Int in
             Int(buffer[0]) + Int(buffer[1]) + Int(buffer[2])
@@ -183,9 +183,9 @@ extension Memory.Map.Test.Unit {
     func withUnsafeBytesReadAccess() throws {
         let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
 
-        map.write(1, at: 0)
-        map.write(2, at: 1)
-        map.write(3, at: 2)
+        map[0] = 1
+        map[1] = 2
+        map[2] = 3
 
         let sum = map.withUnsafeBytes { buffer -> Int in
             Int(buffer[0]) + Int(buffer[1]) + Int(buffer[2])
@@ -265,7 +265,7 @@ extension Memory.Map.Test.Unit {
         )
 
         // Modify the first byte
-        map.write(65, at: 0) // 'A'
+        map[0] = 65 // 'A'
         try map.sync()
 
         let byte0 = map[0]
@@ -291,7 +291,7 @@ extension Memory.Map.Test.Unit {
         )
 
         let originalByte = map[0]
-        map.write(99, at: 0)
+        map[0] = 99
 
         let newByte = map[0]
 
@@ -396,7 +396,7 @@ extension Memory.Map.Test.Unit {
     func syncAnonymousMapping() throws {
         let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
 
-        map.write(42, at: 0)
+        map[0] = 42
 
         // Sync on anonymous may fail on some platforms, but should not crash
         do {
@@ -421,7 +421,7 @@ extension Memory.Map.Test.Unit {
             safety: .unchecked
         )
 
-        map.write(65, at: 0)
+        map[0] = 65
 
         // Both sync modes should work
         try map.sync(async: false)
@@ -439,7 +439,7 @@ extension Memory.Map.Test.Unit {
     func protectChangesAccess() throws {
         var map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
 
-        map.write(42, at: 0)
+        map[0] = 42
         try map.protect(.read)
 
         let access = map.access
@@ -460,7 +460,7 @@ extension Memory.Map.Test.Unit {
         try map.protect([.read, .write])
 
         let access = map.access
-        map.write(100, at: 0)
+        map[0] = 100
         let byte0 = map[0]
 
         map.unmap()
@@ -564,6 +564,123 @@ extension Memory.Map.Test.EdgeCase {
     // are not needed because Memory.Map is ~Copyable. Once unmap() consumes
     // the map, the compiler prevents any further access - making these
     // error conditions impossible at runtime.
+
+    // MARK: - Zero-length Edge Cases
+
+    @Test("zero-length bytes range behavior")
+    func zeroLengthBytesRangeBehavior() throws {
+        // Zero-length mappings are platform-specific
+        // On most platforms, mmap with length 0 fails
+        let content = "Test content"
+        let (path, fd) = try KernelIOTest.createTempFileWithContent(content)
+
+        #expect(throws: Memory.Error.self) {
+            _ = try Memory.Map(
+                fileDescriptor: fd,
+                range: .bytes(offset: 0, length: 0),
+                access: .read,
+                safety: .unchecked
+            )
+        }
+
+        KernelIOTest.cleanupTempFile(path: path, fd: fd)
+    }
+
+    // MARK: - Alignment Edge Cases
+
+    @Test("non-page-aligned length is rounded up")
+    func nonPageAlignedLengthRoundedUp() throws {
+        let map = try Memory.Map(anonymousLength: 100, access: [.read, .write])
+
+        // Internal mapping length should be page-aligned
+        // User-visible length should be the requested length
+        let length = map.length
+        let hasBase = map.baseAddress != nil
+
+        map.unmap()
+
+        #expect(length == 100) // User sees requested length
+        #expect(hasBase)
+    }
+
+    @Test("offset at allocation granularity boundary")
+    func offsetAtGranularityBoundary() throws {
+        // Create file large enough to test offset alignment
+        let content = String(repeating: "X", count: 131072) // 128KB
+        let (path, fd) = try KernelIOTest.createTempFileWithContent(content)
+
+        // Map at exact granularity boundary
+        let granularity = Memory.Allocation.granularity
+        let map = try Memory.Map(
+            fileDescriptor: fd,
+            range: .bytes(offset: Kernel.File.Offset(granularity._rawValue), length: 4096),
+            access: .read,
+            safety: .unchecked
+        )
+
+        let isMapped = map.isMapped
+        let length = map.length
+
+        map.unmap()
+        KernelIOTest.cleanupTempFile(path: path, fd: fd)
+
+        #expect(isMapped)
+        #expect(length == 4096)
+    }
+
+    @Test("non-granularity-aligned offset works")
+    func nonGranularityAlignedOffsetWorks() throws {
+        // Create file large enough to test offset alignment
+        let content = String(repeating: "Y", count: 131072) // 128KB
+        let (path, fd) = try KernelIOTest.createTempFileWithContent(content)
+
+        // Map at non-aligned offset (internal alignment should handle this)
+        let map = try Memory.Map(
+            fileDescriptor: fd,
+            range: .bytes(offset: 1000, length: 4096),
+            access: .read,
+            safety: .unchecked
+        )
+
+        let isMapped = map.isMapped
+        let length = map.length
+        // The first byte should be at offset 1000 in the file
+        let byte0 = map[0]
+
+        map.unmap()
+        KernelIOTest.cleanupTempFile(path: path, fd: fd)
+
+        #expect(isMapped)
+        #expect(length == 4096)
+        #expect(byte0 == UInt8(ascii: "Y"))
+    }
+
+    // MARK: - Subscript Bounds Edge Cases
+
+    @Test("subscript at last valid index")
+    func subscriptAtLastValidIndex() throws {
+        let map = try Memory.Map(anonymousLength: 100, access: [.read, .write])
+
+        // Write and read at last valid index
+        map[99] = 255
+        let byte = map[99]
+
+        map.unmap()
+
+        #expect(byte == 255)
+    }
+
+    @Test("subscript at first index")
+    func subscriptAtFirstIndex() throws {
+        let map = try Memory.Map(anonymousLength: 100, access: [.read, .write])
+
+        map[0] = 1
+        let byte = map[0]
+
+        map.unmap()
+
+        #expect(byte == 1)
+    }
     #endif
 
     #if os(Windows)
@@ -582,6 +699,47 @@ extension Memory.Map.Test.EdgeCase {
         map.unmap()
 
         #expect(wasMapped)
+    }
+
+    // MARK: - Alignment Edge Cases (Windows)
+
+    @Test("non-page-aligned length is rounded up (Windows)")
+    func nonPageAlignedLengthRoundedUpWindows() throws {
+        let map = try Memory.Map.anonymous(length: 100, access: [.read, .write])
+
+        let length = map.length
+        let hasBase = map.baseAddress != nil
+
+        map.unmap()
+
+        #expect(length == 100)
+        #expect(hasBase)
+    }
+
+    // MARK: - Subscript Bounds Edge Cases (Windows)
+
+    @Test("subscript at last valid index (Windows)")
+    func subscriptAtLastValidIndexWindows() throws {
+        let map = try Memory.Map.anonymous(length: 100, access: [.read, .write])
+
+        map[99] = 255
+        let byte = map[99]
+
+        map.unmap()
+
+        #expect(byte == 255)
+    }
+
+    @Test("subscript at first index (Windows)")
+    func subscriptAtFirstIndexWindows() throws {
+        let map = try Memory.Map.anonymous(length: 100, access: [.read, .write])
+
+        map[0] = 1
+        let byte = map[0]
+
+        map.unmap()
+
+        #expect(byte == 1)
     }
     #endif
 }

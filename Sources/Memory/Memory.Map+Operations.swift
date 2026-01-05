@@ -120,12 +120,24 @@ extension Memory.Map {
     /// - Parameter index: The byte index (0-based).
     /// - Returns: The byte value at that index.
     /// - Precondition: `index` must be in bounds.
+    /// - Precondition: The mapping must be valid.
+    /// - Precondition: (setter only) The mapping must have write access.
     public subscript(index: Index) -> UInt8 {
-        precondition(index._rawValue >= 0 && index._rawValue < Int(userLength._rawValue), "Index out of bounds")
-        guard let base = baseAddress else {
-            preconditionFailure("Mapping is not valid")
+        get {
+            precondition(index._rawValue >= 0 && index._rawValue < Int(userLength._rawValue), "Index out of bounds")
+            guard let base = baseAddress else {
+                preconditionFailure("Mapping is not valid")
+            }
+            return base.load(fromByteOffset: index._rawValue, as: UInt8.self)
         }
-        return base.load(fromByteOffset: index._rawValue, as: UInt8.self)
+        nonmutating set {
+            precondition(access.allows.write, "Mapping does not allow writes")
+            precondition(index._rawValue >= 0 && index._rawValue < Int(userLength._rawValue), "Index out of bounds")
+            guard let base = mutableBaseAddress else {
+                preconditionFailure("Mapping is not valid")
+            }
+            base.storeBytes(of: newValue, toByteOffset: index._rawValue, as: UInt8.self)
+        }
     }
 
     /// Provides read-only access to the mapped bytes.
@@ -158,22 +170,6 @@ extension Memory.Map {
         }
         let buffer = UnsafeMutableRawBufferPointer(start: base, count: Int(userLength))
         return try body(buffer)
-    }
-
-    /// Writes a byte at the given index.
-    ///
-    /// - Parameters:
-    ///   - value: The byte value to write.
-    ///   - index: The byte index (0-based).
-    /// - Precondition: The mapping must have write access.
-    /// - Precondition: `index` must be in bounds.
-    public func write(_ value: UInt8, at index: Index) {
-        precondition(access.allows.write, "Mapping does not allow writes")
-        precondition(index._rawValue >= 0 && index._rawValue < Int(userLength._rawValue), "Index out of bounds")
-        guard let base = mutableBaseAddress else {
-            preconditionFailure("Mapping is not valid")
-        }
-        base.storeBytes(of: value, toByteOffset: index._rawValue, as: UInt8.self)
     }
 }
 

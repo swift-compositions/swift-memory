@@ -33,6 +33,14 @@ extension Memory.Lock {
     ///
     /// This type is internal to the Memory module. Users interact with
     /// locking through `Memory.Map.Safety` configuration.
+    ///
+    /// ## Thread Safety
+    ///
+    /// `Token` is `@unchecked Sendable` but is designed for single-ownership.
+    /// The lock is released when `release()` is called or on deinit.
+    /// Concurrent calls to `release()` from multiple threads are safe
+    /// (guarded by `isReleased` flag), but this should be avoided—
+    /// the token should be owned by a single `Memory.Map` instance.
     final class Token: @unchecked Sendable {
         private let descriptor: Kernel.Descriptor
         private let range: Kernel.Lock.Range

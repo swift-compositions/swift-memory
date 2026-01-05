@@ -30,11 +30,31 @@ extension Memory {
     ///
     /// ## Thread Safety
     ///
-    /// `Region` is `@unchecked Sendable` because:
-    /// - The underlying memory mapping is a raw pointer to shared memory
-    /// - The compiler cannot verify thread-safe access patterns
-    /// - Callers must ensure appropriate synchronization when accessing
-    ///   the mapped memory from multiple threads/tasks
+    /// `Memory.Map` is `@unchecked Sendable`. The mapping itself is safe
+    /// to share across tasks, but:
+    /// - Concurrent writes to the same offset are data races
+    /// - Caller must synchronize access when multiple tasks write
+    /// - Read-only mappings can be safely shared across tasks without synchronization
+    ///
+    /// ## Executor Guarantees
+    ///
+    /// All operations are synchronous and execute on the caller's context.
+    /// No internal scheduling or dispatching occurs. Operations complete
+    /// before returning.
+    ///
+    /// ## Cancellation
+    ///
+    /// Operations do not check for Swift Concurrency task cancellation.
+    /// Long-running operations (large mappings, slow I/O) will complete
+    /// even if the task is cancelled. Callers must implement their own
+    /// cancellation checks if needed.
+    ///
+    /// ## Resource Scope
+    ///
+    /// The mapping holds resources until explicitly unmapped via `unmap()` or
+    /// when the value goes out of scope (deinit). File descriptors are NOT
+    /// owned by the mapping—the caller retains responsibility for closing them.
+    /// Lock tokens (in `.coordinated` safety mode) are released with the mapping.
     ///
     /// ## Example
     /// ```swift
