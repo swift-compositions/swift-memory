@@ -86,8 +86,7 @@ extension Memory.Shared.Test.Unit {
         defer { try? Memory.Shared.unlink(name: name) }
 
         let fd = try Memory.Shared.open(name: name, mode: .create.readWrite)
-        let rawValue = fd.rawValue
-        #expect(rawValue >= 0)
+        #expect(fd.isValid)
     }
 
     @Test("exclusive create fails if exists")
@@ -104,8 +103,7 @@ extension Memory.Shared.Test.Unit {
             return
         }
 
-        let rawValue = fd1.rawValue
-        #expect(rawValue >= 0)
+        #expect(fd1.isValid)
 
         // Second create should fail
         #expect(throws: Memory.Error.self) {
@@ -127,8 +125,7 @@ extension Memory.Shared.Test.Unit {
 
         // Open existing (readWrite without create)
         let fd2 = try Memory.Shared.open(name: name, mode: .readWrite)
-        let rawValue = fd2.rawValue
-        #expect(rawValue >= 0)
+        #expect(fd2.isValid)
     }
 
     @Test("unlink removes shared memory")
@@ -143,8 +140,7 @@ extension Memory.Shared.Test.Unit {
             return
         }
 
-        let rawValue = fd.rawValue
-        #expect(rawValue >= 0)
+        #expect(fd.isValid)
 
         try Memory.Shared.unlink(name: name)
 
@@ -169,7 +165,7 @@ extension Memory.Shared.Test.Unit {
         )
         defer { try? Memory.Shared.close(shm) }
 
-        #expect(shm.rawValue != nil)
+        #expect(shm.isValid)
     }
 
     @Test("close shared memory")
@@ -201,8 +197,8 @@ extension Memory.Shared.Test.Unit {
         let shm2 = try Memory.Shared.open(name: name, mode: .readWrite)
 
         // Both should be valid
-        #expect(shm1.rawValue != nil)
-        #expect(shm2.rawValue != nil)
+        #expect(shm1.isValid)
+        #expect(shm2.isValid)
 
         try Memory.Shared.close(shm2)
         try Memory.Shared.close(shm1)

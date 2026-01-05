@@ -273,9 +273,9 @@ extension Memory.Map {
             let region: Kernel.Memory.Map.Region
             do throws(Kernel.Memory.Map.Error) {
                 region = try Kernel.Memory.Map.File.map(
-                    handle: fileHandle.rawValue,
-                    offset: alignedOffset._rawValue,
-                    length: Int(mappingLen),
+                    descriptor: fileHandle,
+                    offset: alignedOffset,
+                    length: mappingLen,
                     protection: access.kernelProtection,
                     copyOnWrite: sharing == .private
                 )

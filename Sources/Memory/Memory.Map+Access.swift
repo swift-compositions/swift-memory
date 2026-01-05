@@ -36,9 +36,9 @@ extension Memory.Map {
     /// - `.write` requires `.read` on most platforms (POSIX constraint)
     /// - `.execute` is intentionally not included due to portability and security concerns
     public struct Access: OptionSet, Sendable, Hashable {
-        public let rawValue: Int32
+        public let rawValue: Int
 
-        public init(rawValue: Int32) {
+        public init(rawValue: Int) {
             self.rawValue = rawValue
         }
     }
