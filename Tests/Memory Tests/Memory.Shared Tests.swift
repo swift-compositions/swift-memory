@@ -31,16 +31,16 @@ extension Memory.Shared.Test.Unit {
         #expect(access == .read)
     }
 
-    @Test("mode readWrite")
-    func modeReadWrite() {
-        let mode = Memory.Shared.Mode.readWrite
+    @Test("mode from array literal")
+    func modeFromArrayLiteral() {
+        let mode: Memory.Shared.Mode = [.read, .write]
         let access = mode.access
         #expect(access == [.read, .write])
     }
 
-    @Test("mode create readWrite")
-    func modeCreateReadWrite() {
-        let mode = Memory.Shared.Mode.create.readWrite
+    @Test("mode with create option")
+    func modeCreate() {
+        let mode = Memory.Shared.Mode(access: [.read, .write], options: .create)
         let access = mode.access
         let options = mode.options
         #expect(access == [.read, .write])
@@ -71,7 +71,7 @@ extension Memory.Shared.Test.Unit {
     func modeIsEquatable() {
         let a = Memory.Shared.Mode.read
         let b = Memory.Shared.Mode.read
-        let c = Memory.Shared.Mode.readWrite
+        let c: Memory.Shared.Mode = [.read, .write]
 
         #expect(a == b)
         #expect(a != c)
@@ -85,7 +85,7 @@ extension Memory.Shared.Test.Unit {
         let name = "/swift-memory-test-\(UInt32.random(in: 0..<UInt32.max))"
         defer { try? Memory.Shared.unlink(name: name) }
 
-        let fd = try Memory.Shared.open(name: name, mode: .create.readWrite)
+        let fd = try Memory.Shared.open(name: name, mode: .create.exclusive)
         #expect(fd.isValid)
     }
 
@@ -118,13 +118,13 @@ extension Memory.Shared.Test.Unit {
 
         // Create - may fail on some systems due to sandbox restrictions
         do {
-            _ = try Memory.Shared.open(name: name, mode: .create.readWrite)
+            _ = try Memory.Shared.open(name: name, mode: .create.exclusive)
         } catch {
             return
         }
 
-        // Open existing (readWrite without create)
-        let fd2 = try Memory.Shared.open(name: name, mode: .readWrite)
+        // Open existing (read-write without create)
+        let fd2 = try Memory.Shared.open(name: name, mode: [.read, .write])
         #expect(fd2.isValid)
     }
 
@@ -135,7 +135,7 @@ extension Memory.Shared.Test.Unit {
         // Create - may fail on some systems due to sandbox restrictions
         let fd: Kernel.File.Descriptor
         do {
-            fd = try Memory.Shared.open(name: name, mode: .create.readWrite)
+            fd = try Memory.Shared.open(name: name, mode: .create.exclusive)
         } catch {
             return
         }
@@ -161,7 +161,7 @@ extension Memory.Shared.Test.Unit {
         let shm = try Memory.Shared.open(
             name: name,
             size: 4096,
-            mode: .create.readWrite
+            mode: .create.exclusive
         )
         defer { try? Memory.Shared.close(shm) }
 
@@ -175,7 +175,7 @@ extension Memory.Shared.Test.Unit {
         let shm = try Memory.Shared.open(
             name: name,
             size: 4096,
-            mode: .create.readWrite
+            mode: .create.exclusive
         )
 
         try Memory.Shared.close(shm)
@@ -190,11 +190,11 @@ extension Memory.Shared.Test.Unit {
         let shm1 = try Memory.Shared.open(
             name: name,
             size: 4096,
-            mode: .create.readWrite
+            mode: .create.exclusive
         )
 
         // Open existing (without size, uses open(name:mode:))
-        let shm2 = try Memory.Shared.open(name: name, mode: .readWrite)
+        let shm2 = try Memory.Shared.open(name: name, mode: [.read, .write])
 
         // Both should be valid
         #expect(shm1.isValid)

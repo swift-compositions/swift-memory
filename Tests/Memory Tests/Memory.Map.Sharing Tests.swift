@@ -9,7 +9,6 @@
 //
 // ===----------------------------------------------------------------------===//
 
-import Kernel
 import StandardsTestSupport
 import Testing
 
@@ -44,17 +43,7 @@ extension Memory.Map.Sharing.Test.Unit {
         #expect(a != c)
     }
 
-    @Test("kernel flags for shared")
-    func kernelFlagsForShared() {
-        let sharing = Memory.Map.Sharing.shared
-        #expect(sharing.kernelFlags == .shared)
-    }
-
-    @Test("kernel flags for private")
-    func kernelFlagsForPrivate() {
-        let sharing = Memory.Map.Sharing.private
-        #expect(sharing.kernelFlags == .private)
-    }
+    // Kernel.Memory.Map.Sharing conversions are tested in swift-kernel
 
     #if os(macOS) || os(Linux)
     @Test("anonymous mapping default is private")

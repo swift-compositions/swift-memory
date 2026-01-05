@@ -9,7 +9,6 @@
 //
 // ===----------------------------------------------------------------------===//
 
-import Kernel
 import StandardsTestSupport
 import Testing
 
@@ -57,19 +56,7 @@ extension Memory.Map.Access.Test.Unit {
         // Should not throw
     }
 
-    @Test("kernel protection for read")
-    func kernelProtectionForRead() {
-        let access: Memory.Map.Access = .read
-        let protection = access.kernelProtection
-        #expect(protection == .read)
-    }
-
-    @Test("kernel protection for read-write")
-    func kernelProtectionForReadWrite() {
-        let access: Memory.Map.Access = [.read, .write]
-        let protection = access.kernelProtection
-        #expect(protection == (Kernel.Memory.Map.Protection.read | Kernel.Memory.Map.Protection.write))
-    }
+    // Kernel.Memory.Map.Protection conversions are tested in swift-kernel
 
     @Test("empty access")
     func emptyAccess() {

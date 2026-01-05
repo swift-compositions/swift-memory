@@ -21,25 +21,7 @@ extension Memory {
 // MARK: - Unit Tests
 
 extension Memory.Test.Unit {
-    @Test("page.size is positive")
-    func pageSizePositive() {
-        #expect(Memory.page.size > 0)
-    }
-
-    @Test("page.size is at least 4096")
-    func pageSizeAtLeast4K() {
-        #expect(Memory.page.size >= 4096)
-    }
-
-    @Test("allocation.granularity is positive")
-    func allocationGranularityPositive() {
-        #expect(Memory.allocation.granularity > 0)
-    }
-
-    @Test("allocation.granularity >= page.size")
-    func allocationGranularityAtLeastPageSize() {
-        #expect(Memory.allocation.granularity >= Memory.page.size)
-    }
+    // Kernel.System properties (pageSize, allocationGranularity) are tested in swift-kernel
 }
 
 // MARK: - Edge Case Tests

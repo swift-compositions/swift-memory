@@ -35,7 +35,7 @@ extension Memory {
     /// // Create shared memory
     /// let shm = try Memory.Shared.open(
     ///     name: "/my-shared-mem",
-    ///     mode: .create.readWrite
+    ///     mode: .create.exclusive
     /// )
     /// defer { try? Memory.Shared.unlink(name: "/my-shared-mem") }
     ///
@@ -58,7 +58,7 @@ extension Memory {
     /// let shm = try Memory.Shared.open(
     ///     name: "Local\\my-shared-mem",
     ///     size: 4096,
-    ///     mode: .create.readWrite
+    ///     mode: .create.exclusive
     /// )
     /// // No unlink needed - closes automatically
     /// ```
@@ -92,11 +92,27 @@ extension Memory.Shared {
         /// Open existing read-only.
         public static let read = Mode(access: .read)
 
-        /// Open existing read-write.
-        public static let readWrite = Mode(access: [.read, .write])
-
         /// Nested accessor for create modes.
         public static var create: Create.Type { Create.self }
+    }
+}
+
+// MARK: - ExpressibleByArrayLiteral
+
+extension Memory.Shared.Mode: ExpressibleByArrayLiteral {
+    /// Creates a mode from an array literal of access flags.
+    ///
+    /// This allows concise mode specification:
+    /// ```swift
+    /// mode: [.read, .write]  // read-write access, no options
+    /// mode: [.read]          // read-only access
+    /// ```
+    public init(arrayLiteral elements: Kernel.Memory.Shared.Access...) {
+        var access = Kernel.Memory.Shared.Access()
+        for element in elements {
+            access.formUnion(element)
+        }
+        self.init(access: access)
     }
 }
 
@@ -104,18 +120,16 @@ extension Memory.Shared {
 
 extension Memory.Shared.Mode {
     /// Create mode variants for shared memory.
+    ///
+    /// These provide convenience statics for common creation patterns.
+    /// For full control, use `Mode(access:options:permissions:)` directly.
     public enum Create {
-        /// Create or open read-write.
-        public static var readWrite: Memory.Shared.Mode {
-            Memory.Shared.Mode(access: [.read, .write], options: .create)
-        }
-
-        /// Create exclusively (fails if exists).
+        /// Create exclusively (fails if exists) with read-write access.
         public static var exclusive: Memory.Shared.Mode {
             Memory.Shared.Mode(access: [.read, .write], options: [.create, .exclusive])
         }
 
-        /// Create, truncate if exists.
+        /// Create with truncate (if exists) with read-write access.
         ///
         /// - Note: On Windows, truncate is ignored. The size is fixed at creation.
         public static var truncate: Memory.Shared.Mode {
@@ -149,7 +163,7 @@ extension Memory.Shared {
     /// ```swift
     /// let shm = try Memory.Shared.open(
     ///     name: "/my-ipc-buffer",
-    ///     mode: .create.readWrite
+    ///     mode: .create.exclusive
     /// )
     /// ```
     public static func open(
@@ -229,7 +243,7 @@ extension Memory.Shared {
     /// let shm = try Memory.Shared.open(
     ///     name: "Local\\my-ipc-buffer",
     ///     size: 4096,
-    ///     mode: .create.readWrite
+    ///     mode: .create.exclusive
     /// )
     /// ```
     public static func open(

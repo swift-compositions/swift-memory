@@ -9,7 +9,6 @@
 //
 // ===----------------------------------------------------------------------===//
 
-import Kernel
 import StandardsTestSupport
 import Testing
 
@@ -22,14 +21,7 @@ extension Memory.Page.Lock {
 // MARK: - Unit Tests
 
 extension Memory.Page.Lock.Test.Unit {
-    @Test("isProcessWideLockingSupported returns correct value")
-    func isProcessWideLockingSupportedTest() {
-        #if os(Windows)
-        #expect(!Memory.Page.Lock.isProcessWideLockingSupported)
-        #else
-        #expect(Memory.Page.Lock.isProcessWideLockingSupported)
-        #endif
-    }
+    // Platform capabilities (isProcessWideLockingSupported) are tested in swift-kernel
 
     #if os(macOS) || os(Linux)
     @Test("lock and unlock memory map")

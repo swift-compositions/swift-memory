@@ -66,15 +66,13 @@ public import Kernel
             }
 
             let requestedOffset = range.offset
-            let granularity = Kernel.System.allocationGranularity
-            // Align down to granularity boundary
-            let alignedOffset = Kernel.System.alignDown(requestedOffset, to: granularity)
-            // Delta is always non-negative (alignDown rounds down)
+            // Align down to allocation granularity boundary
+            let alignedOffset = Memory.Allocation.align.down(requestedOffset)
+            // Delta is always non-negative (align.down rounds down)
             let delta = Kernel.File.Size(requestedOffset - alignedOffset)
             // Compute total mapping length, aligned up to page size
-            let pageSize = Kernel.System.pageSize
             let totalLength = userLen + delta
-            let mappingLen = Kernel.System.alignUp(totalLength, to: pageSize)
+            let mappingLen = Memory.Page.align.up(totalLength)
 
             // Phase 2: Acquire resources using helper that handles cleanup
             let (region, lockToken) = try Self.acquireResources(
@@ -259,15 +257,13 @@ extension Memory.Map {
 
             // Compute alignment
             let requestedOffset = range.offset
-            let granularity = Kernel.System.allocationGranularity
-            // Align down to granularity boundary
-            let alignedOffset = Kernel.System.alignDown(requestedOffset, to: granularity)
-            // Delta is always non-negative (alignDown rounds down)
+            // Align down to allocation granularity boundary
+            let alignedOffset = Memory.Allocation.align.down(requestedOffset)
+            // Delta is always non-negative (align.down rounds down)
             let delta = Kernel.File.Size(requestedOffset - alignedOffset)
             // Compute total mapping length, aligned up to page size
-            let pageSize = Kernel.System.pageSize
             let totalLength = userLen + delta
-            let mappingLen = Kernel.System.alignUp(totalLength, to: pageSize)
+            let mappingLen = Memory.Page.align.up(totalLength)
 
             // Map the file
             let region: Kernel.Memory.Map.Region
@@ -338,8 +334,7 @@ extension Memory.Map {
         ) throws(Memory.Error) {
             try access.validate()
 
-            let pageSize = Kernel.System.pageSize
-            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
+            let mappingLen = Memory.Page.align.up(length)
 
             let region: Kernel.Memory.Map.Region
             do throws(Kernel.Memory.Map.Error) {
@@ -404,8 +399,7 @@ extension Memory.Map {
         ) throws(Memory.Error) -> Self {
             try access.validate()
 
-            let pageSize = Kernel.System.pageSize
-            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
+            let mappingLen = Memory.Page.align.up(length)
 
             let region: Kernel.Memory.Map.Region
             do {
@@ -468,8 +462,7 @@ extension Memory.Map {
         ) throws(Memory.Error) {
             try access.validate()
 
-            let pageSize = Kernel.System.pageSize
-            let mappingLen = Kernel.System.alignUp(length, to: pageSize)
+            let mappingLen = Memory.Page.align.up(length)
 
             let baseAddress: Kernel.Memory.Address
             do {

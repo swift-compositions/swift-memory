@@ -17,8 +17,8 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(path: "../swift-kernel"),
-        .package(url: "https://github.com/swift-standards/swift-standards", from: "0.27.3"),
+        .package(url: "https://github.com/coenttb/swift-kernel", from: "0.5.0"),
+        .package(url: "https://github.com/swift-standards/swift-standards", from: "0.28.0"),
     ],
     targets: [
         .target(
