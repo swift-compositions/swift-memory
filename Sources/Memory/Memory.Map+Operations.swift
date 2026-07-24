@@ -124,19 +124,19 @@ extension Memory.Map {
     /// - Precondition: (setter only) The mapping must have write access.
     public subscript(index: Index) -> UInt8 {
         get {
-            precondition(index._rawValue >= 0 && index._rawValue < Int(userLength._rawValue), "Index out of bounds")
+            precondition(index.rawValue >= 0 && index.rawValue < Int(userLength.rawValue), "Index out of bounds")
             guard let base = baseAddress else {
                 preconditionFailure("Mapping is not valid")
             }
-            return base.load(fromByteOffset: index._rawValue, as: UInt8.self)
+            return base.load(fromByteOffset: index.rawValue, as: UInt8.self)
         }
         nonmutating set {
             precondition(access.allows.write, "Mapping does not allow writes")
-            precondition(index._rawValue >= 0 && index._rawValue < Int(userLength._rawValue), "Index out of bounds")
+            precondition(index.rawValue >= 0 && index.rawValue < Int(userLength.rawValue), "Index out of bounds")
             guard let base = mutableBaseAddress else {
                 preconditionFailure("Mapping is not valid")
             }
-            base.storeBytes(of: newValue, toByteOffset: index._rawValue, as: UInt8.self)
+            base.storeBytes(of: newValue, toByteOffset: index.rawValue, as: UInt8.self)
         }
     }
 
