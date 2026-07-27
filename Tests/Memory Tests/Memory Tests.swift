@@ -9,13 +9,17 @@
 //
 // ===----------------------------------------------------------------------===//
 
-import Test_Primitives
 import Testing
 
 @testable import Memory
 
 extension Memory {
-    #TestSuites
+    enum Test {
+        @Suite struct Unit {}
+        @Suite struct `Edge Case` {}
+        @Suite struct Integration {}
+        @Suite(.serialized) struct Performance {}
+    }
 }
 
 // MARK: - Unit Tests
@@ -26,7 +30,7 @@ extension Memory.Test.Unit {
 
 // MARK: - Edge Case Tests
 
-extension Memory.Test.EdgeCase {
+extension Memory.Test.`Edge Case` {
     // Memory namespace has no edge cases to test
 }
 

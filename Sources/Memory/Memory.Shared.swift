@@ -11,59 +11,8 @@
 
 public import Kernel
 
-extension Memory {
-    /// Shared memory operations for inter-process communication.
-    ///
-    /// Policy layer that provides convenience and error translation on top of
-    /// `Kernel.Memory.Shared` syscall wrappers.
-    ///
-    /// ## Platform Differences
-    ///
-    /// ### POSIX (macOS, Linux)
-    /// - Names must start with '/' (e.g., "/my-shared-mem")
-    /// - Size is set after creation via `ftruncate`
-    /// - Object persists until `unlink()` is called
-    ///
-    /// ### Windows
-    /// - Names use "Local\\" or "Global\\" prefix
-    /// - Size must be specified at creation
-    /// - Object is deleted when all handles are closed
-    ///
-    /// ## Usage (POSIX)
-    ///
-    /// ```swift
-    /// // Create shared memory
-    /// let shm = try Memory.Shared.open(
-    ///     name: "/my-shared-mem",
-    ///     mode: .create.exclusive
-    /// )
-    /// defer { try? Memory.Shared.unlink(name: "/my-shared-mem") }
-    ///
-    /// // Resize for initial use
-    /// try Kernel.File.truncate(descriptor: shm, size: 4096)
-    ///
-    /// // Map into address space
-    /// let map = try Memory.Map.open(
-    ///     fileDescriptor: shm,
-    ///     range: .whole,
-    ///     access: [.read, .write],
-    ///     sharing: .shared
-    /// )
-    /// ```
-    ///
-    /// ## Usage (Windows)
-    ///
-    /// ```swift
-    /// // Create shared memory with size
-    /// let shm = try Memory.Shared.open(
-    ///     name: "Local\\my-shared-mem",
-    ///     size: 4096,
-    ///     mode: .create.exclusive
-    /// )
-    /// // No unlink needed - closes automatically
-    /// ```
-    public enum Shared {}
-}
+// Memory.Shared namespace is declared at L1 (swift-memory-primitives).
+// L3 extends it with policy-layer types (Mode, Access, Options, open(), unlink()).
 
 // MARK: - Open Mode
 
@@ -71,30 +20,32 @@ extension Memory.Shared {
     /// Mode for opening shared memory objects.
     public struct Mode: Sendable, Equatable {
         /// Access mode (read, write, or both).
-        public let access: Kernel.Memory.Shared.Access
+        public let access: Memory.Shared.Access
 
         /// Creation options (create, exclusive, truncate).
-        public let options: Kernel.Memory.Shared.Options
+        public let options: Memory.Shared.Options
 
         /// Permission mode for creation (POSIX only).
         public let permissions: Kernel.File.Permissions
 
         public init(
-            access: Kernel.Memory.Shared.Access,
-            options: Kernel.Memory.Shared.Options = [],
+            access: Memory.Shared.Access,
+            options: Memory.Shared.Options = [],
             permissions: Kernel.File.Permissions = .ownerReadWrite
         ) {
             self.access = access
             self.options = options
             self.permissions = permissions
         }
-
-        /// Open existing read-only.
-        public static let read = Mode(access: .read)
-
-        /// Nested accessor for create modes.
-        public static var create: Create.Type { Create.self }
     }
+}
+
+extension Memory.Shared.Mode {
+    /// Open existing read-only.
+    public static let read = Self(access: .read)
+
+    /// Nested accessor for create modes.
+    public static var create: Create.Type { Create.self }
 }
 
 // MARK: - ExpressibleByArrayLiteral
@@ -107,12 +58,14 @@ extension Memory.Shared.Mode: ExpressibleByArrayLiteral {
     /// mode: [.read, .write]  // read-write access, no options
     /// mode: [.read]          // read-only access
     /// ```
-    public init(arrayLiteral elements: Kernel.Memory.Shared.Access...) {
-        var access = Kernel.Memory.Shared.Access()
+    public init(arrayLiteral elements: Memory.Shared.Access...) {
+        var read = false
+        var write = false
         for element in elements {
-            access.formUnion(element)
+            if element.read { read = true }
+            if element.write { write = true }
         }
-        self.init(access: access)
+        self.init(access: Memory.Shared.Access(read: read, write: write))
     }
 }
 
@@ -123,18 +76,26 @@ extension Memory.Shared.Mode {
     ///
     /// These provide convenience statics for common creation patterns.
     /// For full control, use `Mode(access:options:permissions:)` directly.
-    public enum Create {
-        /// Create exclusively (fails if exists) with read-write access.
-        public static var exclusive: Memory.Shared.Mode {
-            Memory.Shared.Mode(access: [.read, .write], options: [.create, .exclusive])
-        }
+    public enum Create {}
+}
 
-        /// Create with truncate (if exists) with read-write access.
-        ///
-        /// - Note: On Windows, truncate is ignored. The size is fixed at creation.
-        public static var truncate: Memory.Shared.Mode {
-            Memory.Shared.Mode(access: [.read, .write], options: [.create, .truncate])
-        }
+extension Memory.Shared.Mode.Create {
+    /// Create exclusively (fails if exists) with read-write access.
+    public static var exclusive: Memory.Shared.Mode {
+        Memory.Shared.Mode(
+            access: .readWrite,
+            options: [.create, .exclusive]
+        )
+    }
+
+    /// Create with truncate (if exists) with read-write access.
+    ///
+    /// - Note: On Windows, truncate is ignored. The size is fixed at creation.
+    public static var truncate: Memory.Shared.Mode {
+        Memory.Shared.Mode(
+            access: .readWrite,
+            options: [.create, .truncate]
+        )
     }
 }
 
@@ -167,29 +128,32 @@ extension Memory.Shared.Mode {
         /// )
         /// ```
         public static func open(
-            name: String,
+            name: Swift.String,
             mode: Mode
         ) throws(Memory.Error) -> Kernel.Descriptor {
-            var result: Result<Kernel.Descriptor, Kernel.Memory.Shared.Error>!
-            name.withCString { namePtr in
-                do throws(Kernel.Memory.Shared.Error) {
-                    let fd = try Kernel.Memory.Shared.open(
+            // Avoid Result<Kernel.Descriptor, ...> — Result requires Copyable.
+            // withCString also requires Copyable return, so capture via side channel.
+            var fd: Kernel.Descriptor? = nil
+            var openError: Memory.Shared.Error? = nil
+            unsafe name.withCString { namePtr in
+                do throws(Self.Error) {
+                    fd = try unsafe Self.open(
                         name: namePtr,
                         access: mode.access,
                         options: mode.options,
                         permissions: mode.permissions
                     )
-                    result = .success(fd)
                 } catch {
-                    result = .failure(error)
+                    openError = error
                 }
             }
-            switch result! {
-            case .success(let fd):
+            if let fd {
                 return fd
-            case .failure(let error):
-                throw Memory.Error(from: error)
             }
+            if let openError {
+                throw Memory.Error(from: openError)
+            }
+            preconditionFailure("unreachable: withCString must set fd or openError")
         }
 
         /// Removes a POSIX shared memory object.
@@ -199,11 +163,11 @@ extension Memory.Shared.Mode {
         ///
         /// - Parameter name: The name of the shared memory object to remove.
         /// - Throws: `Memory.Error` if the operation fails.
-        public static func unlink(name: String) throws(Memory.Error) {
-            var unlinkError: Kernel.Memory.Shared.Error?
-            name.withCString { namePtr in
-                do throws(Kernel.Memory.Shared.Error) {
-                    try Kernel.Memory.Shared.unlink(name: namePtr)
+        public static func unlink(name: Swift.String) throws(Memory.Error) {
+            var unlinkError: Memory.Shared.Error?
+            unsafe name.withCString { namePtr in
+                do throws(Self.Error) {
+                    try unsafe Self.unlink(name: namePtr)
                 } catch {
                     unlinkError = error
                 }
@@ -247,12 +211,12 @@ extension Memory.Shared.Mode {
         /// )
         /// ```
         public static func open(
-            name: String,
+            name: Swift.String,
             size: Kernel.File.Size,
             mode: Mode
         ) throws(Memory.Error) -> Kernel.Descriptor {
-            do throws(Kernel.Memory.Shared.Error) {
-                return try Kernel.Memory.Shared.open(
+            do throws(Self.Error) {
+                return try Self.open(
                     name: name,
                     size: size,
                     access: mode.access,
@@ -271,11 +235,11 @@ extension Memory.Shared.Mode {
         /// - Returns: A descriptor for the shared memory object.
         /// - Throws: `Memory.Error` if the operation fails.
         public static func open(
-            name: String,
+            name: Swift.String,
             mode: Mode
         ) throws(Memory.Error) -> Kernel.Descriptor {
-            do throws(Kernel.Memory.Shared.Error) {
-                return try Kernel.Memory.Shared.open(
+            do throws(Self.Error) {
+                return try Self.open(
                     name: name,
                     access: mode.access
                 )
@@ -295,8 +259,8 @@ extension Memory.Shared.Mode {
         /// - Parameter descriptor: The descriptor to close.
         /// - Throws: `Memory.Error` if the operation fails.
         public static func close(_ descriptor: Kernel.Descriptor) throws(Memory.Error) {
-            do throws(Kernel.Memory.Shared.Error) {
-                try Kernel.Memory.Shared.close(descriptor)
+            do throws(Self.Error) {
+                try Self.close(descriptor)
             } catch {
                 throw Memory.Error(from: error)
             }

@@ -10,44 +10,48 @@
 // ===----------------------------------------------------------------------===//
 
 import Kernel
-import Test_Primitives
 import Testing
 
 @testable import Memory
 
 extension Memory.Map.Range {
-    #TestSuites
+    enum Test {
+        @Suite struct Unit {}
+        @Suite struct `Edge Case` {}
+        @Suite struct Integration {}
+        @Suite(.serialized) struct Performance {}
+    }
 }
 
 // MARK: - Unit Tests
 
 extension Memory.Map.Range.Test.Unit {
-    @Test("bytes range offset")
-    func bytesRangeOffset() {
+    @Test
+    func `bytes range offset`() {
         let range = Memory.Map.Range.bytes(offset: 100, length: 500)
         #expect(range.offset == 100)
     }
 
-    @Test("bytes range length")
-    func bytesRangeLength() {
+    @Test
+    func `bytes range length`() {
         let range = Memory.Map.Range.bytes(offset: 100, length: 500)
         #expect(range.length == 500)
     }
 
-    @Test("whole range offset is zero")
-    func wholeRangeOffsetIsZero() {
+    @Test
+    func `whole range offset is zero`() {
         let range = Memory.Map.Range.whole
         #expect(range.offset == 0)
     }
 
-    @Test("whole range length is nil")
-    func wholeRangeLengthIsNil() {
+    @Test
+    func `whole range length is nil`() {
         let range = Memory.Map.Range.whole
         #expect(range.length == nil)
     }
 
-    @Test("range is equatable")
-    func rangeIsEquatable() {
+    @Test
+    func `range is equatable`() {
         let a = Memory.Map.Range.bytes(offset: 0, length: 100)
         let b = Memory.Map.Range.bytes(offset: 0, length: 100)
         let c = Memory.Map.Range.bytes(offset: 0, length: 200)
@@ -58,15 +62,15 @@ extension Memory.Map.Range.Test.Unit {
         #expect(a != Memory.Map.Range.whole)
     }
 
-    @Test("bytes range with zero offset")
-    func bytesRangeWithZeroOffset() {
+    @Test
+    func `bytes range with zero offset`() {
         let range = Memory.Map.Range.bytes(offset: 0, length: 4096)
         #expect(range.offset == 0)
         #expect(range.length == 4096)
     }
 
-    @Test("bytes range with large offset")
-    func bytesRangeWithLargeOffset() {
+    @Test
+    func `bytes range with large offset`() {
         let range = Memory.Map.Range.bytes(offset: 1_000_000_000, length: 4096)
         #expect(range.offset == 1_000_000_000)
     }
@@ -74,7 +78,7 @@ extension Memory.Map.Range.Test.Unit {
 
 // MARK: - Edge Case Tests
 
-extension Memory.Map.Range.Test.EdgeCase {
+extension Memory.Map.Range.Test.`Edge Case` {
     // Range is a simple enum with no edge cases
 }
 

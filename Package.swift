@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.3.3
 
 import PackageDescription
 
@@ -8,7 +8,8 @@ let package = Package(
         .macOS(.v26),
         .iOS(.v26),
         .tvOS(.v26),
-        .watchOS(.v26)
+        .watchOS(.v26),
+        .visionOS(.v26)
     ],
     products: [
         .library(
@@ -17,14 +18,21 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/coenttb/swift-kernel", from: "0.5.0"),
-        .package(path: "../../swift-primitives/swift-test-primitives")
+        .package(url: "https://github.com/swift-foundations/swift-kernel.git", branch: "main"),
+        .package(url: "https://github.com/swift-primitives/swift-memory-primitives.git", branch: "main"),
+        .package(url: "https://github.com/swift-primitives/swift-memory-lock-primitives.git", branch: "main"),
+        .package(url: "https://github.com/swift-primitives/swift-memory-shared-primitives.git", branch: "main"),
+        .package(url: "https://github.com/swift-primitives/swift-memory-map-primitives.git", branch: "main"),
     ],
     targets: [
         .target(
             name: "Memory",
             dependencies: [
-                .product(name: "Kernel", package: "swift-kernel")
+                .product(name: "Kernel", package: "swift-kernel"),
+                .product(name: "Memory Primitives", package: "swift-memory-primitives"),
+                .product(name: "Memory Lock Primitives", package: "swift-memory-lock-primitives"),
+                .product(name: "Memory Shared Primitives", package: "swift-memory-shared-primitives"),
+                .product(name: "Memory Map Primitives", package: "swift-memory-map-primitives"),
             ]
         ),
         .testTarget(
@@ -32,17 +40,27 @@ let package = Package(
             dependencies: [
                 "Memory",
                 .product(name: "Kernel Test Support", package: "swift-kernel"),
-                .product(name: "Test Primitives", package: "swift-test-primitives")
             ]
-        )
-    ]
+        ),
+    ],
+    swiftLanguageModes: [.v6]
 )
 
-for target in package.targets where ![.system, .binary, .plugin].contains(target.type) {
-    let settings: [SwiftSetting] = [
+for target in package.targets where ![.system, .binary, .plugin, .macro].contains(target.type) {
+    let ecosystem: [SwiftSetting] = [
+        .strictMemorySafety(),
         .enableUpcomingFeature("ExistentialAny"),
         .enableUpcomingFeature("InternalImportsByDefault"),
-        .enableUpcomingFeature("MemberImportVisibility")
+        .enableUpcomingFeature("MemberImportVisibility"),
+        .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+        .enableExperimentalFeature("LifetimeDependence"),
+        .enableExperimentalFeature("Lifetimes"),
+        .enableExperimentalFeature("SuppressedAssociatedTypes"),
+        .enableUpcomingFeature("InferIsolatedConformances"),
+        .enableUpcomingFeature("LifetimeDependence"),
     ]
-    target.swiftSettings = (target.swiftSettings ?? []) + settings
+
+    let package: [SwiftSetting] = []
+
+    target.swiftSettings = (target.swiftSettings ?? []) + ecosystem + package
 }

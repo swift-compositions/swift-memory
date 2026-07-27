@@ -10,20 +10,24 @@
 // ===----------------------------------------------------------------------===//
 
 import Kernel
-import Test_Primitives
 import Testing
 
 @testable import Memory
 
 extension Memory.Map.Safety {
-    #TestSuites
+    enum Test {
+        @Suite struct Unit {}
+        @Suite struct `Edge Case` {}
+        @Suite struct Integration {}
+        @Suite(.serialized) struct Performance {}
+    }
 }
 
 // MARK: - Unit Tests
 
 extension Memory.Map.Safety.Test.Unit {
-    @Test("unchecked safety")
-    func uncheckedSafety() {
+    @Test
+    func `unchecked safety`() {
         let safety = Memory.Map.Safety.unchecked
         if case .unchecked = safety {
             // Correct
@@ -32,8 +36,8 @@ extension Memory.Map.Safety.Test.Unit {
         }
     }
 
-    @Test("coordinated shared safety")
-    func coordinatedSharedSafety() {
+    @Test
+    func `coordinated shared safety`() {
         let safety = Memory.Map.Safety.coordinated(.shared, scope: .file)
         if case .coordinated(let kind, let scope) = safety {
             #expect(kind == .shared)
@@ -43,8 +47,8 @@ extension Memory.Map.Safety.Test.Unit {
         }
     }
 
-    @Test("coordinated exclusive safety")
-    func coordinatedExclusiveSafety() {
+    @Test
+    func `coordinated exclusive safety`() {
         let safety = Memory.Map.Safety.coordinated(.exclusive, scope: .mapped)
         if case .coordinated(let kind, let scope) = safety {
             #expect(kind == .exclusive)
@@ -54,8 +58,8 @@ extension Memory.Map.Safety.Test.Unit {
         }
     }
 
-    @Test("default read safety")
-    func defaultReadSafety() {
+    @Test
+    func `default read safety`() {
         let safety = Memory.Map.Safety.default.read
         if case .coordinated(let kind, let scope) = safety {
             #expect(kind == .shared)
@@ -65,8 +69,8 @@ extension Memory.Map.Safety.Test.Unit {
         }
     }
 
-    @Test("default write safety")
-    func defaultWriteSafety() {
+    @Test
+    func `default write safety`() {
         let safety = Memory.Map.Safety.default.write
         if case .coordinated(let kind, let scope) = safety {
             #expect(kind == .exclusive)
@@ -76,20 +80,20 @@ extension Memory.Map.Safety.Test.Unit {
         }
     }
 
-    @Test("scope file")
-    func scopeFile() {
+    @Test
+    func `scope file`() {
         let scope = Memory.Map.Safety.Scope.file
         #expect(scope == .file)
     }
 
-    @Test("scope mapped")
-    func scopeMapped() {
+    @Test
+    func `scope mapped`() {
         let scope = Memory.Map.Safety.Scope.mapped
         #expect(scope == .mapped)
     }
 
-    @Test("safety is equatable")
-    func safetyIsEquatable() {
+    @Test
+    func `safety is equatable`() {
         let a = Memory.Map.Safety.unchecked
         let b = Memory.Map.Safety.unchecked
         let c = Memory.Map.Safety.coordinated(.shared, scope: .file)
@@ -98,8 +102,8 @@ extension Memory.Map.Safety.Test.Unit {
         #expect(a != c)
     }
 
-    @Test("scope is equatable")
-    func scopeIsEquatable() {
+    @Test
+    func `scope is equatable`() {
         let a = Memory.Map.Safety.Scope.file
         let b = Memory.Map.Safety.Scope.file
         let c = Memory.Map.Safety.Scope.mapped
@@ -108,16 +112,16 @@ extension Memory.Map.Safety.Test.Unit {
         #expect(a != c)
     }
 
-    @Test("coordinated with different scopes are not equal")
-    func coordinatedDifferentScopes() {
+    @Test
+    func `coordinated with different scopes are not equal`() {
         let fileScope = Memory.Map.Safety.coordinated(.shared, scope: .file)
         let mappedScope = Memory.Map.Safety.coordinated(.shared, scope: .mapped)
 
         #expect(fileScope != mappedScope)
     }
 
-    @Test("coordinated with different kinds are not equal")
-    func coordinatedDifferentKinds() {
+    @Test
+    func `coordinated with different kinds are not equal`() {
         let shared = Memory.Map.Safety.coordinated(.shared, scope: .file)
         let exclusive = Memory.Map.Safety.coordinated(.exclusive, scope: .file)
 
@@ -127,7 +131,7 @@ extension Memory.Map.Safety.Test.Unit {
 
 // MARK: - Edge Case Tests
 
-extension Memory.Map.Safety.Test.EdgeCase {
+extension Memory.Map.Safety.Test.`Edge Case` {
     // Safety is a simple enum with no edge cases
 }
 

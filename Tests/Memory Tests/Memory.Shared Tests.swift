@@ -10,13 +10,17 @@
 // ===----------------------------------------------------------------------===//
 
 import Kernel
-import Test_Primitives
 import Testing
 
 @testable import Memory
 
 extension Memory.Shared {
-    #TestSuites
+    enum Test {
+        @Suite struct Unit {}
+        @Suite struct `Edge Case` {}
+        @Suite struct Integration {}
+        @Suite(.serialized) struct Performance {}
+    }
 }
 
 // MARK: - Unit Tests
@@ -24,51 +28,51 @@ extension Memory.Shared {
 extension Memory.Shared.Test.Unit {
     // MARK: - Mode Tests
 
-    @Test("mode read")
-    func modeRead() {
+    @Test
+    func `mode read`() {
         let mode = Memory.Shared.Mode.read
         let access = mode.access
         #expect(access == .read)
     }
 
-    @Test("mode from array literal")
-    func modeFromArrayLiteral() {
+    @Test
+    func `mode from array literal`() {
         let mode: Memory.Shared.Mode = [.read, .write]
         let access = mode.access
-        #expect(access == [.read, .write])
+        #expect(access == .readWrite)
     }
 
-    @Test("mode with create option")
-    func modeCreate() {
-        let mode = Memory.Shared.Mode(access: [.read, .write], options: .create)
+    @Test
+    func `mode with create option`() {
+        let mode = Memory.Shared.Mode(access: .readWrite, options: .create)
         let access = mode.access
         let options = mode.options
-        #expect(access == [.read, .write])
+        #expect(access == .readWrite)
         #expect(options.contains(.create))
     }
 
-    @Test("mode create exclusive")
-    func modeCreateExclusive() {
+    @Test
+    func `mode create exclusive`() {
         let mode = Memory.Shared.Mode.create.exclusive
         let access = mode.access
         let options = mode.options
-        #expect(access == [.read, .write])
+        #expect(access == .readWrite)
         #expect(options.contains(.create))
         #expect(options.contains(.exclusive))
     }
 
-    @Test("mode create truncate")
-    func modeCreateTruncate() {
+    @Test
+    func `mode create truncate`() {
         let mode = Memory.Shared.Mode.create.truncate
         let access = mode.access
         let options = mode.options
-        #expect(access == [.read, .write])
+        #expect(access == .readWrite)
         #expect(options.contains(.create))
         #expect(options.contains(.truncate))
     }
 
-    @Test("mode is equatable")
-    func modeIsEquatable() {
+    @Test
+    func `mode is equatable`() {
         let a = Memory.Shared.Mode.read
         let b = Memory.Shared.Mode.read
         let c: Memory.Shared.Mode = [.read, .write]
@@ -80,30 +84,32 @@ extension Memory.Shared.Test.Unit {
     // MARK: - POSIX Shared Memory Tests
 
     #if os(macOS) || os(Linux)
-        @Test("open and unlink shared memory")
-        func openAndUnlinkSharedMemory() throws {
+        @Test
+        func `open and unlink shared memory`() throws {
             let name = "/swift-memory-test-\(UInt32.random(in: 0..<UInt32.max))"
             defer { try? Memory.Shared.unlink(name: name) }
 
             let fd = try Memory.Shared.open(name: name, mode: .create.exclusive)
-            #expect(fd.isValid)
+            let isValid = fd.isValid
+            #expect(isValid)
         }
 
-        @Test("exclusive create fails if exists")
-        func exclusiveCreateFailsIfExists() throws {
+        @Test
+        func `exclusive create fails if exists`() throws {
             let name = "/swift-memory-test-excl-\(UInt32.random(in: 0..<UInt32.max))"
             defer { try? Memory.Shared.unlink(name: name) }
 
             // Create first time - may fail on some systems due to sandbox restrictions
             let fd1: Kernel.File.Descriptor
-            do {
+            do throws(Memory.Error) {
                 fd1 = try Memory.Shared.open(name: name, mode: .create.exclusive)
             } catch {
                 // Shared memory may not be available on this system
                 return
             }
 
-            #expect(fd1.isValid)
+            let fd1IsValid = fd1.isValid
+            #expect(fd1IsValid)
 
             // Second create should fail
             #expect(throws: Memory.Error.self) {
@@ -111,13 +117,13 @@ extension Memory.Shared.Test.Unit {
             }
         }
 
-        @Test("open existing shared memory")
-        func openExistingSharedMemory() throws {
+        @Test
+        func `open existing shared memory`() throws {
             let name = "/swift-memory-test-open-\(UInt32.random(in: 0..<UInt32.max))"
             defer { try? Memory.Shared.unlink(name: name) }
 
             // Create - may fail on some systems due to sandbox restrictions
-            do {
+            do throws(Memory.Error) {
                 _ = try Memory.Shared.open(name: name, mode: .create.exclusive)
             } catch {
                 return
@@ -125,22 +131,24 @@ extension Memory.Shared.Test.Unit {
 
             // Open existing (read-write without create)
             let fd2 = try Memory.Shared.open(name: name, mode: [.read, .write])
-            #expect(fd2.isValid)
+            let fd2IsValid = fd2.isValid
+            #expect(fd2IsValid)
         }
 
-        @Test("unlink removes shared memory")
-        func unlinkRemovesSharedMemory() throws {
+        @Test
+        func `unlink removes shared memory`() throws {
             let name = "/swift-memory-test-unlink-\(UInt32.random(in: 0..<UInt32.max))"
 
             // Create - may fail on some systems due to sandbox restrictions
             let fd: Kernel.File.Descriptor
-            do {
+            do throws(Memory.Error) {
                 fd = try Memory.Shared.open(name: name, mode: .create.exclusive)
             } catch {
                 return
             }
 
-            #expect(fd.isValid)
+            let fdIsValid = fd.isValid
+            #expect(fdIsValid)
 
             try Memory.Shared.unlink(name: name)
 
@@ -154,8 +162,8 @@ extension Memory.Shared.Test.Unit {
     // MARK: - Windows Shared Memory Tests
 
     #if os(Windows)
-        @Test("open shared memory with size")
-        func openSharedMemoryWithSize() throws {
+        @Test
+        func `open shared memory with size`() throws {
             let name = "Local\\swift-memory-test-\(UInt32.random(in: 0..<UInt32.max))"
 
             let shm = try Memory.Shared.open(
@@ -168,8 +176,8 @@ extension Memory.Shared.Test.Unit {
             #expect(shm.isValid)
         }
 
-        @Test("close shared memory")
-        func closeSharedMemory() throws {
+        @Test
+        func `close shared memory`() throws {
             let name = "Local\\swift-memory-test-close-\(UInt32.random(in: 0..<UInt32.max))"
 
             let shm = try Memory.Shared.open(
@@ -182,8 +190,8 @@ extension Memory.Shared.Test.Unit {
             // Should not throw
         }
 
-        @Test("open existing shared memory (Windows)")
-        func openExistingSharedMemoryWindows() throws {
+        @Test
+        func `open existing shared memory (Windows)`() throws {
             let name = "Local\\swift-memory-test-open-\(UInt32.random(in: 0..<UInt32.max))"
 
             // Create with size
@@ -208,10 +216,10 @@ extension Memory.Shared.Test.Unit {
 
 // MARK: - Edge Case Tests
 
-extension Memory.Shared.Test.EdgeCase {
+extension Memory.Shared.Test.`Edge Case` {
     #if os(macOS) || os(Linux)
-        @Test("unlink non-existent fails")
-        func unlinkNonExistentFails() {
+        @Test
+        func `unlink non-existent fails`() {
             let name = "/swift-memory-test-nonexistent-\(UInt32.random(in: 0..<UInt32.max))"
 
             #expect(throws: Memory.Error.self) {
@@ -219,8 +227,8 @@ extension Memory.Shared.Test.EdgeCase {
             }
         }
 
-        @Test("open non-existent read-only fails")
-        func openNonExistentReadOnlyFails() {
+        @Test
+        func `open non-existent read-only fails`() {
             let name = "/swift-memory-test-nonexistent-\(UInt32.random(in: 0..<UInt32.max))"
 
             #expect(throws: Memory.Error.self) {
@@ -230,8 +238,8 @@ extension Memory.Shared.Test.EdgeCase {
     #endif
 
     #if os(Windows)
-        @Test("open non-existent fails (Windows)")
-        func openNonExistentFailsWindows() {
+        @Test
+        func `open non-existent fails (Windows)`() {
             let name = "Local\\swift-memory-test-nonexistent-\(UInt32.random(in: 0..<UInt32.max))"
 
             #expect(throws: Memory.Error.self) {

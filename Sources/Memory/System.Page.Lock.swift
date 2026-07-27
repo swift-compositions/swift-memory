@@ -11,15 +11,10 @@
 
 public import Kernel
 
-extension Memory {
-    /// Page-level memory operations.
-    public enum Page {}
-}
-
-extension Memory.Page {
+extension System.Page {
     /// Page locking operations (prevent swapping).
     ///
-    /// Thin wrapper over `Kernel.Memory.Lock` that provides convenience
+    /// Thin wrapper over `Memory.Lock` that provides convenience
     /// methods for locking memory mappings.
     ///
     /// ## Usage
@@ -28,8 +23,8 @@ extension Memory.Page {
     /// let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
     ///
     /// // Lock the mapping in RAM
-    /// try Memory.Page.Lock.lock(map)
-    /// defer { try? Memory.Page.Lock.unlock(map) }
+    /// try System.Page.Lock.lock(map)
+    /// defer { do throws(Memory.Error) { try System.Page.Lock.unlock(map) } catch {} }
     ///
     /// // Memory is now guaranteed to not be swapped
     /// ```
@@ -51,50 +46,52 @@ extension Memory.Page {
     /// - No process-wide locking (`all.lock`/`all.unlock` unavailable)
     /// - Locked pages count against the process working set quota
     /// - The minimum working set size may need adjustment via `SetProcessWorkingSetSize`
-    /// - Use `Memory.Page.Lock.all.isSupported` to check availability at runtime
+    /// - Use `System.Page.Lock.all.isSupported` to check availability at runtime
     public enum Lock {}
 }
 
 // MARK: - All Pages Accessor
 
-extension Memory.Page.Lock {
+extension System.Page.Lock {
     /// Nested accessor for all-pages operations.
     public static var all: All.Type { All.self }
 
     /// Operations that affect all pages in the process address space.
-    public enum All {
-        /// Whether process-wide page locking is supported on this platform.
-        ///
-        /// - Returns: `true` on POSIX systems (macOS, Linux), `false` on Windows.
-        ///
-        /// Use this to conditionally enable process-wide locking:
-        /// ```swift
-        /// if Memory.Page.Lock.all.isSupported {
-        ///     try Memory.Page.Lock.all.lock(.current)
-        /// }
-        /// ```
-        public static var isSupported: Bool {
-            #if os(Windows)
-                return false
-            #else
-                return true
-            #endif
-        }
+    public enum All {}
+}
+
+extension System.Page.Lock.All {
+    /// Whether process-wide page locking is supported on this platform.
+    ///
+    /// - Returns: `true` on POSIX systems (macOS, Linux), `false` on Windows.
+    ///
+    /// Use this to conditionally enable process-wide locking:
+    /// ```swift
+    /// if System.Page.Lock.all.isSupported {
+    ///     try System.Page.Lock.all.lock(.current)
+    /// }
+    /// ```
+    public static var isSupported: Bool {
+        #if os(Windows)
+            return false
+        #else
+            return true
+        #endif
     }
 }
 
 // MARK: - Lock/Unlock Individual Ranges
 
-extension Memory.Page.Lock {
+extension System.Page.Lock {
     /// Locks a memory range in RAM, preventing it from being swapped.
     ///
     /// - Parameters:
     ///   - address: The starting address of the memory range.
     ///   - size: The number of bytes to lock.
     /// - Throws: `Memory.Error` if locking fails.
-    public static func lock(address: UnsafeRawPointer, size: Kernel.File.Size) throws(Memory.Error) {
-        do throws(Kernel.Memory.Lock.Error) {
-            try Kernel.Memory.Lock.lock(address: address, length: size)
+    public static func lock(address: UnsafeRawPointer, size: Memory.Address.Count) throws(Memory.Error) {
+        do throws(Memory.Lock.Error) {
+            try unsafe Memory.Lock.lock(address: address, length: size)
         } catch {
             throw Memory.Error(from: error)
         }
@@ -106,9 +103,9 @@ extension Memory.Page.Lock {
     ///   - address: The starting address of the memory range.
     ///   - size: The number of bytes to unlock.
     /// - Throws: `Memory.Error` if unlocking fails.
-    public static func unlock(address: UnsafeRawPointer, size: Kernel.File.Size) throws(Memory.Error) {
-        do throws(Kernel.Memory.Lock.Error) {
-            try Kernel.Memory.Lock.unlock(address: address, length: size)
+    public static func unlock(address: UnsafeRawPointer, size: Memory.Address.Count) throws(Memory.Error) {
+        do throws(Memory.Lock.Error) {
+            try unsafe Memory.Lock.unlock(address: address, length: size)
         } catch {
             throw Memory.Error(from: error)
         }
@@ -117,16 +114,16 @@ extension Memory.Page.Lock {
 
 // MARK: - Convenience for Memory.Map
 
-extension Memory.Page.Lock {
+extension System.Page.Lock {
     /// Locks an entire memory mapping in RAM.
     ///
     /// - Parameter map: The memory mapping to lock.
     /// - Throws: `Memory.Error` if locking fails.
     public static func lock(_ map: borrowing Memory.Map) throws(Memory.Error) {
-        guard let base = map.baseAddress else {
+        guard let base = unsafe map.baseAddress else {
             throw .unmapped
         }
-        try lock(address: base, size: map.length)
+        try unsafe lock(address: base, size: map.length)
     }
 
     /// Unlocks an entire memory mapping.
@@ -134,19 +131,19 @@ extension Memory.Page.Lock {
     /// - Parameter map: The memory mapping to unlock.
     /// - Throws: `Memory.Error` if unlocking fails.
     public static func unlock(_ map: borrowing Memory.Map) throws(Memory.Error) {
-        guard let base = map.baseAddress else {
+        guard let base = unsafe map.baseAddress else {
             throw .unmapped
         }
-        try unlock(address: base, size: map.length)
+        try unsafe unlock(address: base, size: map.length)
     }
 }
 
 // MARK: - Lock All (POSIX only)
 
 #if !os(Windows)
-    extension Memory.Page.Lock.All {
-        /// Flags for locking all pages.
-        public typealias Flags = Kernel.Memory.Lock.All.Flags
+    extension System.Page.Lock.All {
+        /// Options for locking all pages.
+        public typealias Options = Memory.Lock.All.Options
 
         /// Locks all current and/or future pages in the process address space.
         ///
@@ -163,12 +160,12 @@ extension Memory.Page.Lock {
         ///
         /// ```swift
         /// // Lock all current and future pages
-        /// try Memory.Page.Lock.all.lock(.current | .future)
-        /// defer { try? Memory.Page.Lock.all.unlock() }
+        /// try System.Page.Lock.all.lock(.current | .future)
+        /// defer { do throws(Memory.Error) { try System.Page.Lock.all.unlock() } catch {} }
         /// ```
-        public static func lock(_ flags: Flags) throws(Memory.Error) {
-            do throws(Kernel.Memory.Lock.Error) {
-                try Kernel.Memory.Lock.lockAll(flags)
+        public static func lock(_ options: Options) throws(Memory.Error) {
+            do throws(Memory.Lock.Error) {
+                try Memory.Lock.lockAll(options)
             } catch {
                 throw Memory.Error(from: error)
             }
@@ -178,8 +175,8 @@ extension Memory.Page.Lock {
         ///
         /// - Throws: `Memory.Error` if unlocking fails.
         public static func unlock() throws(Memory.Error) {
-            do throws(Kernel.Memory.Lock.Error) {
-                try Kernel.Memory.Lock.unlockAll()
+            do throws(Memory.Lock.Error) {
+                try Memory.Lock.unlockAll()
             } catch {
                 throw Memory.Error(from: error)
             }

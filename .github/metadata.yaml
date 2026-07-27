@@ -1,0 +1,9 @@
+# .github/metadata.yaml
+# Triaged by AI-assisted bulk pass (2026-04-29).
+description: "Safe, ergonomic memory-mapped file I/O and shared memory for Swift."
+topics:
+  - foundations
+  - memory
+homepage: "https://swift-institute.org"
+readme:
+  family: E

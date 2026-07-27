@@ -10,56 +10,60 @@
 // ===----------------------------------------------------------------------===//
 
 import Kernel
-import Test_Primitives
 import Testing
 
 @testable import Memory
 
 extension Memory.Advice {
-    #TestSuites
+    enum Test {
+        @Suite struct Unit {}
+        @Suite struct `Edge Case` {}
+        @Suite struct Integration {}
+        @Suite(.serialized) struct Performance {}
+    }
 }
 
 // MARK: - Unit Tests
 
 #if os(macOS) || os(Linux)
     extension Memory.Advice.Test.Unit {
-        @Test("sequential advice on mapping")
-        func sequentialAdvice() throws {
+        @Test
+        func `sequential advice on mapping`() throws {
             let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
             Memory.Advice.sequential(map)
             map.unmap()
         }
 
-        @Test("random advice on mapping")
-        func randomAdvice() throws {
+        @Test
+        func `random advice on mapping`() throws {
             let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
             Memory.Advice.random(map)
             map.unmap()
         }
 
-        @Test("prefetch advice on mapping")
-        func prefetchAdvice() throws {
+        @Test
+        func `prefetch advice on mapping`() throws {
             let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
             Memory.Advice.prefetch(map)
             map.unmap()
         }
 
-        @Test("forget advice on mapping")
-        func forgetAdvice() throws {
+        @Test
+        func `forget advice on mapping`() throws {
             let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
             Memory.Advice.forget(map)
             map.unmap()
         }
 
-        @Test("normal advice on mapping")
-        func normalAdvice() throws {
+        @Test
+        func `normal advice on mapping`() throws {
             let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
             Memory.Advice.normal(map)
             map.unmap()
         }
 
-        @Test("advise method on map")
-        func adviseMethodOnMap() throws {
+        @Test
+        func `advise method on map`() throws {
             let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
             map.advise(.sequential)
             map.advise(.random)
@@ -71,8 +75,8 @@ extension Memory.Advice {
 
 #if os(Windows)
     extension Memory.Advice.Test.Unit {
-        @Test("advice is no-op on Windows")
-        func adviceNoOpOnWindows() throws {
+        @Test
+        func `advice is no-op on Windows`() throws {
             let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
             map.advise(.sequential)
             map.unmap()
@@ -82,7 +86,7 @@ extension Memory.Advice {
 
 // MARK: - Edge Case Tests
 
-extension Memory.Advice.Test.EdgeCase {
+extension Memory.Advice.Test.`Edge Case` {
     // Advice on unmapped region is a no-op (guard pattern in advise)
     // No error thrown, just returns early
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the swift-memory open source project
 //
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
+// Copyright (c) 2024-2026 Coen ten Thije Boonkkamp and the swift-memory project authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE for license information
@@ -10,27 +10,27 @@
 // ===----------------------------------------------------------------------===//
 
 public import Kernel
+@_spi(MemoryInternal) public import Memory_Map_Primitives
 
 // MARK: - Consuming Operations
 
 extension Memory.Map {
     /// Unmaps the region and releases all resources.
     ///
-    /// This is the canonical way to release a mapping. After calling `unmap()`,
-    /// the region cannot be used.
-    ///
-    /// - Note: This is a consuming function - the region is moved and destroyed.
+    /// After calling `unmap()`, the region cannot be used.
     public consuming func unmap() {
-        guard let currentRegion = region else { return }
+        guard let currentRegion = _region else { return }
 
-        // Release lock token first
-        lockToken?.release()
+        // Release lock token (its release closure unlocks + closes the dup'd fd)
+        _lockToken?.release()
 
-        // Unmap the region
-        try? Kernel.Memory.Map.unmap(currentRegion)
+        // Unmap the region via the witness closure (resolves to L2 syscall on active platform)
+        do throws(Self.Error) {
+            try Self.unmap(currentRegion)
+        } catch {}
 
-        // Mark as unmapped so deinit becomes a no-op
-        region = nil
+        // Mark unmapped so deinit becomes a no-op
+        _region = nil
     }
 }
 
@@ -39,30 +39,14 @@ extension Memory.Map {
 #if !os(Windows)
     extension Memory.Map {
         /// Remaps the region to a new range.
-        ///
-        /// This is a consuming operation that:
-        /// 1. Unmaps the current region
-        /// 2. Creates a new mapping with the specified range
-        /// 3. Returns the new region
-        ///
-        /// - Parameters:
-        ///   - fileDescriptor: The file descriptor to map.
-        ///   - range: The new range to map.
-        /// - Returns: A new `Region` with the specified range.
-        /// - Throws: `Memory.Error` if remapping fails.
-        ///
-        /// - Note: On Linux, this may use `mremap()` for efficiency when possible.
         public consuming func remap(
-            fileDescriptor: Kernel.Descriptor,
+            fileDescriptor: borrowing Kernel.Descriptor,
             range: Range
         ) throws(Memory.Error) -> Self {
-            // Capture values before consuming self
             let capturedAccess = access
             let capturedSharing = sharing
             let capturedSafety = safety
 
-            // For now, we do unmap + map
-            // Linux optimization with mremap could be added later
             self.unmap()
 
             return try Self(
@@ -78,23 +62,10 @@ extension Memory.Map {
 
 #if os(Windows)
     extension Memory.Map {
-        /// Remaps the region to a new range.
-        ///
-        /// This is a consuming operation that:
-        /// 1. Unmaps the current region
-        /// 2. Creates a new mapping with the specified range
-        /// 3. Returns the new region
-        ///
-        /// - Parameters:
-        ///   - fileHandle: The file handle to map.
-        ///   - range: The new range to map.
-        /// - Returns: A new `Region` with the specified range.
-        /// - Throws: `Memory.Error` if remapping fails.
         public consuming func remap(
-            fileHandle: Kernel.Descriptor,
+            fileHandle: borrowing Kernel.Descriptor,
             range: Range
         ) throws(Memory.Error) -> Self {
-            // Capture values before consuming self
             let capturedAccess = access
             let capturedSharing = sharing
             let capturedSafety = safety
@@ -116,60 +87,45 @@ extension Memory.Map {
 
 extension Memory.Map {
     /// Accesses a byte at the given index.
-    ///
-    /// - Parameter index: The byte index (0-based).
-    /// - Returns: The byte value at that index.
-    /// - Precondition: `index` must be in bounds.
-    /// - Precondition: The mapping must be valid.
-    /// - Precondition: (setter only) The mapping must have write access.
-    public subscript(index: Index) -> UInt8 {
+    public subscript(index: Index) -> Byte {
         get {
-            precondition(index.rawValue >= 0 && index.rawValue < Int(userLength.rawValue), "Index out of bounds")
-            guard let base = baseAddress else {
+            precondition(index < endIndex, "Index out of bounds")
+            guard let base = unsafe baseAddress else {
                 preconditionFailure("Mapping is not valid")
             }
-            return base.load(fromByteOffset: index.rawValue, as: UInt8.self)
+            return Byte(unsafe base.load(fromByteOffset: Int(bitPattern: index.underlying.rawValue), as: UInt8.self))
         }
         nonmutating set {
             precondition(access.allows.write, "Mapping does not allow writes")
-            precondition(index.rawValue >= 0 && index.rawValue < Int(userLength.rawValue), "Index out of bounds")
-            guard let base = mutableBaseAddress else {
+            precondition(index < endIndex, "Index out of bounds")
+            guard let base = unsafe mutableBaseAddress else {
                 preconditionFailure("Mapping is not valid")
             }
-            base.storeBytes(of: newValue, toByteOffset: index.rawValue, as: UInt8.self)
+            unsafe base.storeBytes(of: newValue.underlying, toByteOffset: Int(bitPattern: index.underlying.rawValue), as: UInt8.self)
         }
     }
 
     /// Provides read-only access to the mapped bytes.
-    ///
-    /// - Parameter body: A closure that receives an `UnsafeRawBufferPointer`.
-    /// - Returns: The result of the closure.
-    /// - Throws: Rethrows any error from the closure.
-    public func withUnsafeBytes<T>(
-        _ body: (UnsafeRawBufferPointer) throws -> T
-    ) rethrows -> T {
-        guard let base = baseAddress else {
+    public func withUnsafeBytes<T, E: Swift.Error>(
+        _ body: (UnsafeRawBufferPointer) throws(E) -> T
+    ) throws(E) -> T {
+        guard let base = unsafe baseAddress else {
             preconditionFailure("Mapping is not valid")
         }
-        let buffer = UnsafeRawBufferPointer(start: base, count: Int(userLength))
-        return try body(buffer)
+        let buffer = unsafe UnsafeRawBufferPointer(start: base, count: Int(bitPattern: _userLength.underlying.rawValue))
+        return try unsafe body(buffer)
     }
 
     /// Provides mutable access to the mapped bytes.
-    ///
-    /// - Parameter body: A closure that receives an `UnsafeMutableRawBufferPointer`.
-    /// - Returns: The result of the closure.
-    /// - Throws: Rethrows any error from the closure.
-    /// - Precondition: The mapping must have write access.
-    public func withUnsafeMutableBytes<T>(
-        _ body: (UnsafeMutableRawBufferPointer) throws -> T
-    ) rethrows -> T {
+    public func withUnsafeMutableBytes<T, E: Swift.Error>(
+        _ body: (UnsafeMutableRawBufferPointer) throws(E) -> T
+    ) throws(E) -> T {
         precondition(access.allows.write, "Mapping does not allow writes")
-        guard let base = mutableBaseAddress else {
+        guard let base = unsafe mutableBaseAddress else {
             preconditionFailure("Mapping is not valid")
         }
-        let buffer = UnsafeMutableRawBufferPointer(start: base, count: Int(userLength))
-        return try body(buffer)
+        let buffer = unsafe UnsafeMutableRawBufferPointer(start: base, count: Int(bitPattern: _userLength.underlying.rawValue))
+        return try unsafe body(buffer)
     }
 }
 
@@ -177,17 +133,6 @@ extension Memory.Map {
 
 extension Memory.Map {
     /// Changes the memory protection of the mapped region.
-    ///
-    /// This allows runtime modification of access permissions, for example:
-    /// - Making a region writable after initial read-only mapping
-    /// - Removing write access after initialization is complete
-    ///
-    /// - Parameter newAccess: The new access permissions.
-    /// - Throws: `Memory.Error` if protection change fails.
-    ///
-    /// - Note: The new access must be compatible with the original file
-    ///   descriptor's open mode. You cannot add write access to a region
-    ///   mapped from a read-only file descriptor.
     public mutating func protect(_ newAccess: Access) throws(Memory.Error) {
         try newAccess.validate()
 
@@ -195,8 +140,8 @@ extension Memory.Map {
             throw .unmapped
         }
 
-        do throws(Kernel.Memory.Map.Error) {
-            try Kernel.Memory.Map.protect(
+        do throws(Self.Error) {
+            try Self.protect(
                 addr: base,
                 length: mappingLength,
                 protection: newAccess.kernelProtection
@@ -212,21 +157,17 @@ extension Memory.Map {
 
 extension Memory.Map {
     /// Synchronizes the mapped region to disk.
-    ///
-    /// - Parameter async: If `true`, returns immediately and syncs asynchronously.
-    ///                    (Ignored on Windows, which only has synchronous flush.)
-    /// - Throws: `Memory.Error` if sync fails.
     public func sync(async: Bool = false) throws(Memory.Error) {
         guard let base = mappingBaseAddress else {
             throw .unmapped
         }
 
-        do throws(Kernel.Memory.Map.Error) {
+        do throws(Self.Error) {
             #if os(Windows)
-                try Kernel.Memory.Map.sync(addr: base, length: mappingLength)
+                try unsafe Self.sync(addr: base, length: mappingLength)
             #else
-                let flags: Kernel.Memory.Map.Sync.Flags = async ? .async : .sync
-                try Kernel.Memory.Map.sync(addr: base, length: mappingLength, flags: flags)
+                let flags: Memory.Map.Sync.Options = async ? .async : .sync
+                try Self.sync(addr: base, length: mappingLength, flags: flags)
             #endif
         } catch {
             throw Memory.Error(from: error)
@@ -234,22 +175,61 @@ extension Memory.Map {
     }
 
     /// Provides a hint about expected access patterns.
-    ///
-    /// This is advisory - the system may ignore the hint.
-    ///
-    /// - Parameter advice: The access pattern hint.
-    public func advise(_ advice: Kernel.Memory.Map.Advice) {
+    public func advise(_ advice: Memory.Map.Advice) {
         guard let base = mappingBaseAddress else { return }
-        Kernel.Memory.Map.advise(addr: base, length: mappingLength, advice: advice)
+        Self.advise(addr: base, length: mappingLength, advice: advice)
     }
+}
+
+// MARK: - Computed Properties (formerly in Memory.Map.swift L3)
+
+extension Memory.Map {
+    /// The base address of the actual OS mapping (granularity-aligned).
+    var mappingBaseAddress: Memory.Address? { _region?.base }
+
+    /// The length of the actual OS mapping.
+    var mappingLength: Memory.Address.Count { _region?.length ?? .zero }
+
+    /// The base address for user access (adjusted for offset delta).
+    public var baseAddress: UnsafeRawPointer? {
+        guard let base = mappingBaseAddress else { return nil }
+        return unsafe base.pointer.advanced(by: Int(bitPattern: _offsetDelta.underlying.rawValue))
+    }
+
+    /// Mutable base address (only valid if access includes write).
+    public var mutableBaseAddress: UnsafeMutableRawPointer? {
+        guard access.allows.write, let base = mappingBaseAddress else { return nil }
+        return unsafe base.mutablePointer.advanced(by: Int(bitPattern: _offsetDelta.underlying.rawValue))
+    }
+
+    /// The length of the mapped region visible to the user.
+    public var length: Memory.Address.Count { _userLength }
+
+    /// The past-the-end index for bounds checking.
+    public var endIndex: Index {
+        Index(Ordinal(_userLength.underlying.rawValue))
+    }
+
+    /// Whether the mapping is still valid.
+    public var isMapped: Bool { _region != nil }
+}
+
+// MARK: - Address Space Types
+
+extension Memory.Map {
+    /// Absolute byte index within a memory mapping.
+    public typealias Index = Tagged<Memory.Map, Ordinal>
+
+    /// Relative byte offset within a memory mapping.
+    public typealias Offset = Index.Offset
 }
 
 // MARK: - Debug Description
 
 extension Memory.Map {
     /// A textual representation for debugging.
-    public var debugDescription: String {
+    public var debugDescription: Swift.String {
         let status = isMapped ? "mapped" : "unmapped"
-        return "Region(\(status), length: \(userLength), access: \(access), sharing: \(sharing), safety: \(safety))"
+        return "Map(\(status), length: \(_userLength), access: \(access), sharing: \(sharing), safety: \(safety))"
     }
 }

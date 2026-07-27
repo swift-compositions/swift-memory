@@ -9,32 +9,36 @@
 //
 // ===----------------------------------------------------------------------===//
 
-import Test_Primitives
 import Testing
 
 @testable import Memory
 
 extension Memory.Map.Sharing {
-    #TestSuites
+    enum Test {
+        @Suite struct Unit {}
+        @Suite struct `Edge Case` {}
+        @Suite struct Integration {}
+        @Suite(.serialized) struct Performance {}
+    }
 }
 
 // MARK: - Unit Tests
 
 extension Memory.Map.Sharing.Test.Unit {
-    @Test("shared mode")
-    func sharedMode() {
+    @Test
+    func `shared mode`() {
         let sharing = Memory.Map.Sharing.shared
         #expect(sharing == .shared)
     }
 
-    @Test("private mode")
-    func privateMode() {
+    @Test
+    func `private mode`() {
         let sharing = Memory.Map.Sharing.private
         #expect(sharing == .private)
     }
 
-    @Test("sharing is equatable")
-    func sharingIsEquatable() {
+    @Test
+    func `sharing is equatable`() {
         let a = Memory.Map.Sharing.shared
         let b = Memory.Map.Sharing.shared
         let c = Memory.Map.Sharing.private
@@ -43,27 +47,27 @@ extension Memory.Map.Sharing.Test.Unit {
         #expect(a != c)
     }
 
-    // Kernel.Memory.Map.Sharing conversions are tested in swift-kernel
+    // Memory.Map.Sharing conversions are tested in swift-kernel
 
     #if os(macOS) || os(Linux)
-        @Test("anonymous mapping default is private")
-        func anonymousMappingDefaultIsPrivate() throws {
+        @Test
+        func `anonymous mapping default is private`() throws {
             let map = try Memory.Map(anonymousLength: 4096)
             let sharing = map.sharing
             map.unmap()
             #expect(sharing == .private)
         }
 
-        @Test("anonymous mapping with shared")
-        func anonymousMappingWithShared() throws {
+        @Test
+        func `anonymous mapping with shared`() throws {
             let map = try Memory.Map(anonymousLength: 4096, sharing: .shared)
             let sharing = map.sharing
             map.unmap()
             #expect(sharing == .shared)
         }
 
-        @Test("anonymous mapping with private")
-        func anonymousMappingWithPrivate() throws {
+        @Test
+        func `anonymous mapping with private`() throws {
             let map = try Memory.Map(anonymousLength: 4096, sharing: .private)
             let sharing = map.sharing
             map.unmap()
@@ -74,7 +78,7 @@ extension Memory.Map.Sharing.Test.Unit {
 
 // MARK: - Edge Case Tests
 
-extension Memory.Map.Sharing.Test.EdgeCase {
+extension Memory.Map.Sharing.Test.`Edge Case` {
     // Sharing is a simple enum with no edge cases
 }
 

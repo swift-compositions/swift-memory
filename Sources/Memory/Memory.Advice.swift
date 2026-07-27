@@ -14,7 +14,7 @@ public import Kernel
 extension Memory {
     /// Memory access advice patterns.
     ///
-    /// Re-exports `Kernel.Memory.Map.Advice` constants and provides
+    /// Re-exports `Memory.Map.Advice` constants and provides
     /// convenience methods for common access patterns.
     ///
     /// ## Usage
@@ -36,7 +36,7 @@ extension Memory {
     /// - `.random`: Random access (read-ahead is not beneficial)
     /// - `.willNeed`: Pages will be needed soon (use `prefetch()`)
     /// - `.dontNeed`: Pages won't be needed soon (use `forget()`)
-    public typealias Advice = Kernel.Memory.Map.Advice
+    public typealias Advice = Memory.Map.Advice
 }
 
 // MARK: - Convenience Methods

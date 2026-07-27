@@ -67,9 +67,11 @@ Add swift-memory to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/coenttb/swift-memory", from: "0.1.0")
+    .package(url: "https://github.com/swift-foundations/swift-memory", branch: "main")
 ]
 ```
+
+> Pre-1.0: no version tags yet. APIs may change; pin a commit for reproducible builds.
 
 Then add the dependency to your target:
 
@@ -428,7 +430,7 @@ swift-memory is part of a layered systems programming stack:
 
 | Package | Role |
 |---------|------|
-| [swift-kernel](https://github.com/coenttb/swift-kernel) | Syscall substrate: raw wrappers for `mmap`, `shm_open`, `CreateFileMapping`, etc. |
+| [swift-kernel](https://github.com/swift-foundations/swift-kernel) | Syscall substrate: raw wrappers for `mmap`, `shm_open`, `CreateFileMapping`, etc. |
 | **swift-memory** | Memory primitives: RAII mappings, shared memory, page locking |
 | swift-io | Async I/O built on mapped memory where appropriate |
 

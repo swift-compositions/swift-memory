@@ -2,7 +2,7 @@
 //
 // This source file is part of the swift-memory open source project
 //
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
+// Copyright (c) 2024-2026 Coen ten Thije Boonkkamp and the swift-memory project authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE for license information
@@ -12,12 +12,15 @@
 public import Kernel
 
 extension Memory {
-    /// Errors that can occur during memory operations.
+    /// Errors that can occur during high-level memory operations.
     ///
-    /// High-level semantic errors are exposed directly. Platform-specific
-    /// errors are wrapped in their respective Kernel error types.
+    /// Composes L1 domain-specific errors with L3 semantic validation errors.
+    /// Per the L1-domain-only / L3-composes architecture, L1 has only
+    /// domain-specific errors (Memory.Map.Error, Memory.Shared.Error,
+    /// Memory.Lock.Error, Memory.Allocation.Error, Memory.Address.Error);
+    /// `Memory.Error` is the L3 top-level wrapper.
     public enum Error: Swift.Error, Sendable {
-        // MARK: - Semantic Errors (Memory-layer validation)
+        // MARK: - L3 Semantic Validation
 
         /// Invalid access combination (e.g., `.write` without `.read`).
         case access
@@ -28,19 +31,21 @@ extension Memory {
         /// The mapping was previously unmapped and cannot be used.
         case unmapped
 
-        // MARK: - Kernel Error Wrappers
+        // MARK: - L1 Domain Error Wrappers
 
         /// Memory mapping operation failed.
-        case map(Kernel.Memory.Map.Error)
+        case map(Memory.Map.Error)
 
         /// Shared memory operation failed.
-        case shared(Kernel.Memory.Shared.Error)
+        case shared(Memory.Shared.Error)
 
-        /// Page locking operation failed.
-        case page(Kernel.Memory.Lock.Error)
+        /// Memory locking operation failed (mlock/munlock vocabulary).
+        case lock(Memory.Lock.Error)
+
+        // MARK: - Cross-Domain Wrappers
 
         /// File locking failed during coordinated mapping.
-        case lock(Kernel.Lock.Error)
+        case fileLock(Kernel.Lock.Error)
 
         /// Failed to get file metadata.
         case stat(Kernel.File.Stats.Error)
@@ -50,22 +55,29 @@ extension Memory {
 // MARK: - CustomStringConvertible
 
 extension Memory.Error: CustomStringConvertible {
-    public var description: String {
+    public var description: Swift.String {
         switch self {
         case .access:
             return "Invalid access combination (write requires read)"
+
         case .size:
             return "File too small for requested mapping"
+
         case .unmapped:
             return "Mapping already unmapped"
+
         case .map(let error):
             return "Memory map: \(error)"
+
         case .shared(let error):
             return "Shared memory: \(error)"
-        case .page(let error):
-            return "Page lock: \(error)"
+
         case .lock(let error):
+            return "Memory lock: \(error)"
+
+        case .fileLock(let error):
             return "File lock: \(error)"
+
         case .stat(let error):
             return "Stat: \(error)"
         }
@@ -75,21 +87,21 @@ extension Memory.Error: CustomStringConvertible {
 // MARK: - Convenience Initializers
 
 extension Memory.Error {
-    /// Creates an error from a Kernel.Memory.Map.Error.
+    /// Creates an error from a Memory.Map.Error.
     @inlinable
-    public init(from error: Kernel.Memory.Map.Error) {
+    public init(from error: Memory.Map.Error) {
         self = .map(error)
     }
 
-    /// Creates an error from a Kernel.Memory.Shared.Error.
+    /// Creates an error from a Memory.Shared.Error.
     @inlinable
-    public init(from error: Kernel.Memory.Shared.Error) {
+    public init(from error: Memory.Shared.Error) {
         self = .shared(error)
     }
 
-    /// Creates an error from a Kernel.Memory.Lock.Error.
+    /// Creates an error from a Memory.Lock.Error.
     @inlinable
-    public init(from error: Kernel.Memory.Lock.Error) {
-        self = .page(error)
+    public init(from error: Memory.Lock.Error) {
+        self = .lock(error)
     }
 }

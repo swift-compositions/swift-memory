@@ -2,7 +2,7 @@
 //
 // This source file is part of the swift-memory open source project
 //
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
+// Copyright (c) 2024-2026 Coen ten Thije Boonkkamp and the swift-memory project authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE for license information
@@ -24,26 +24,13 @@ public import Kernel
         ///   - sharing: The sharing mode (default: `.shared`).
         ///   - safety: The safety mode (defaults based on access).
         /// - Throws: `Memory.Error` if mapping fails.
-        ///
-        /// ## Copy-on-Write
-        ///
-        /// To create a copy-on-write mapping, use `.private` sharing with write access:
-        /// ```swift
-        /// let region = try Memory.Map(
-        ///     fileDescriptor: fd,
-        ///     range: .whole,
-        ///     access: [.read, .write],
-        ///     sharing: .private  // Changes are private to this mapping
-        /// )
-        /// ```
         public init(
-            fileDescriptor: Kernel.Descriptor,
+            fileDescriptor: borrowing Kernel.Descriptor,
             range: Range,
             access: Access = .read,
             sharing: Sharing = .shared,
             safety: Safety? = nil
         ) throws(Memory.Error) {
-            // Phase 1: All validation and computation (no resources acquired)
             try access.validate()
 
             let effectiveSafety = safety ?? (access.allows.write ? .default.write : .default.read)
@@ -52,6 +39,7 @@ public import Kernel
             switch range {
             case .bytes(_, let length):
                 userLen = length
+
             case .whole:
                 let fileStats: Kernel.File.Stats
                 do throws(Kernel.File.Stats.Error) {
@@ -66,101 +54,74 @@ public import Kernel
             }
 
             let requestedOffset = range.offset
-            // Align down to allocation granularity boundary
             let alignedOffset = Memory.Allocation.align.down(requestedOffset)
-            // Delta is always non-negative (align.down rounds down)
             let delta = Kernel.File.Size(requestedOffset - alignedOffset)
-            // Compute total mapping length, aligned up to page size
             let totalLength = userLen + delta
-            let mappingLen = Memory.Page.align.up(totalLength)
+            let mappingLen = System.Page.align.up(totalLength)
 
-            // Phase 2: Acquire resources using helper that handles cleanup
-            let (region, lockToken) = try Self.acquireResources(
-                fileDescriptor: fileDescriptor,
-                alignedOffset: alignedOffset,
-                mappingLen: mappingLen,
-                access: access,
-                sharing: sharing,
-                effectiveSafety: effectiveSafety
-            )
+            // Cross-domain conversion: file-domain Kernel.File.Size →
+            // memory-domain Memory.Address.Count at the file→memory boundary.
+            let mappingLenCount = Memory.Address.Count(UInt(mappingLen.underlying))
 
-            // Phase 3: Initialize all stored properties (no throws after this point)
-            self.region = region
-            self.offsetDelta = delta
-            self.userLength = userLen
-            self.access = access
-            self.sharing = sharing
-            self.safety = effectiveSafety
-            self.lockToken = lockToken
-        }
-
-        /// Acquires mapping and lock resources, handling cleanup on failure.
-        private static func acquireResources(
-            fileDescriptor: Kernel.Descriptor,
-            alignedOffset: Kernel.File.Offset,
-            mappingLen: Kernel.File.Size,
-            access: Access,
-            sharing: Sharing,
-            effectiveSafety: Safety
-        ) throws(Memory.Error) -> (Kernel.Memory.Map.Region, Memory.Lock.Token?) {
-            // Map the file
-            let baseAddress: Kernel.Memory.Address
-            do throws(Kernel.Memory.Map.Error) {
-                baseAddress = try Kernel.Memory.Map.map(
-                    length: mappingLen,
+            let baseAddress: Memory.Address
+            do throws(Self.Error) {
+                baseAddress = try Self.map(
+                    length: mappingLenCount,
                     protection: access.kernelProtection,
-                    flags: sharing.kernelFlags,
-                    fd: fileDescriptor,
+                    flags: sharing.kernelOptions,
+                    descriptor: fileDescriptor,
                     offset: alignedOffset
                 )
             } catch {
                 throw Memory.Error(from: error)
             }
 
-            let region = Kernel.Memory.Map.Region(base: baseAddress, length: mappingLen)
+            let region = Self.Region(base: baseAddress, length: mappingLenCount)
 
-            // Acquire lock if needed
             let lockToken: Memory.Lock.Token?
             if case .coordinated(let kind, let scope) = effectiveSafety {
-                let lockRange = computeLockRange(
+                let lockRange = Self.computeLockRange(
                     scope: scope,
                     alignedOffset: alignedOffset,
                     mappingLength: mappingLen
                 )
-                do {
-                    lockToken = try Memory.Lock.Token(
+                do throws(Kernel.Lock.Error) {
+                    lockToken = try Memory.Lock.Token.acquire(
                         descriptor: fileDescriptor,
                         range: lockRange,
                         kind: kind
                     )
                 } catch {
-                    try? Kernel.Memory.Map.unmap(region)
-                    throw .lock(error)
+                    do throws(Self.Error) {
+                        try Self.unmap(region)
+                    } catch {}
+                    throw .fileLock(error)
                 }
             } else {
                 lockToken = nil
             }
 
-            return (region, lockToken)
+            self.init(
+                region: region,
+                offsetDelta: Memory.Address.Count(UInt(delta.underlying)),
+                userLength: Memory.Address.Count(UInt(userLen.underlying)),
+                access: access,
+                sharing: sharing,
+                safety: effectiveSafety,
+                lockToken: lockToken,
+                unmap: { region in
+                    do throws(Self.Error) {
+                        try Self.unmap(region)
+                    } catch {}
+                }
+            )
         }
-
-        // MARK: - Static Factory Methods (API Parity with Windows)
 
         /// Creates a memory-mapped region from a file descriptor.
         ///
-        /// This static factory method provides API parity with Windows.
-        /// It is equivalent to calling the throwing initializer directly.
-        ///
-        /// - Parameters:
-        ///   - fileDescriptor: The POSIX file descriptor to map.
-        ///   - range: The range to map (offset will be aligned to allocation granularity).
-        ///   - access: The access mode (default: `.read`).
-        ///   - sharing: The sharing mode (default: `.shared`).
-        ///   - safety: The safety mode (defaults based on access).
-        /// - Returns: A new `Map` for the file.
-        /// - Throws: `Memory.Error` if mapping fails.
+        /// Static factory for API parity with Windows.
         public static func open(
-            fileDescriptor: Kernel.Descriptor,
+            fileDescriptor: borrowing Kernel.Descriptor,
             range: Range,
             access: Access = .read,
             sharing: Sharing = .shared,
@@ -174,7 +135,6 @@ public import Kernel
                 safety: safety
             )
         }
-
     }
 #endif
 
@@ -182,17 +142,6 @@ public import Kernel
 
 extension Memory.Map {
     /// Computes the lock range based on scope.
-    ///
-    /// For `.mapped`, the lock range is rounded to the platform's mapping granularity:
-    /// - POSIX: page size
-    /// - Windows: allocation granularity (64KB typically)
-    ///
-    /// This ensures the lock covers exactly the memory region that could be faulted.
-    ///
-    /// - Note: Rounding may lock bytes beyond the logical user-requested range.
-    ///   This is intentional: the lock must cover every byte that the OS mapping
-    ///   could fault on, which includes the padding bytes up to the next granularity
-    ///   boundary.
     static func computeLockRange(
         scope: Safety.Scope,
         alignedOffset: Kernel.File.Offset,
@@ -201,8 +150,13 @@ extension Memory.Map {
         switch scope {
         case .file:
             return .file
+
         case .mapped:
-            return Kernel.Lock.Range(forMappingAt: alignedOffset, length: mappingLength)
+            return Kernel.Lock.Range(
+                forMappingAt: alignedOffset,
+                length: mappingLength,
+                granularity: Memory.Allocation.system
+            )
         }
     }
 }
@@ -211,37 +165,22 @@ extension Memory.Map {
 
 #if os(Windows)
     extension Memory.Map {
-        /// Creates a memory-mapped region from a Windows file handle.
-        ///
-        /// This is a static factory method that works around Swift compiler bugs
-        /// on Windows where throwing inits on ~Copyable structs with Optional<Class>
-        /// fields generate incorrect SIL.
-        ///
-        /// - Parameters:
-        ///   - fileHandle: The Windows file handle to map.
-        ///   - range: The range to map (offset will be aligned to allocation granularity).
-        ///   - access: The access mode (default: `.read`).
-        ///   - sharing: The sharing mode (default: `.shared`).
-        ///   - safety: The safety mode (defaults based on access).
-        /// - Returns: A new `Region` mapping the file.
-        /// - Throws: `Memory.Error` if mapping fails.
         public static func open(
-            fileHandle: Kernel.Descriptor,
+            fileHandle: borrowing Kernel.Descriptor,
             range: Range,
             access: Access = .read,
             sharing: Sharing = .shared,
             safety: Safety? = nil
         ) throws(Memory.Error) -> Self {
-            // Validate access
             try access.validate()
 
             let effectiveSafety = safety ?? (access.allows.write ? .default.write : .default.read)
 
-            // Compute user length
             let userLen: Kernel.File.Size
             switch range {
             case .bytes(_, let length):
                 userLen = length
+
             case .whole:
                 let fileStats: Kernel.File.Stats
                 do throws(Kernel.File.Stats.Error) {
@@ -255,23 +194,20 @@ extension Memory.Map {
                 }
             }
 
-            // Compute alignment
             let requestedOffset = range.offset
-            // Align down to allocation granularity boundary
             let alignedOffset = Memory.Allocation.align.down(requestedOffset)
-            // Delta is always non-negative (align.down rounds down)
             let delta = Kernel.File.Size(requestedOffset - alignedOffset)
-            // Compute total mapping length, aligned up to page size
             let totalLength = userLen + delta
-            let mappingLen = Memory.Page.align.up(totalLength)
+            let mappingLen = System.Page.align.up(totalLength)
 
-            // Map the file
-            let region: Kernel.Memory.Map.Region
-            do throws(Kernel.Memory.Map.Error) {
-                region = try Kernel.Memory.Map.File.map(
+            let mappingLenCount = Memory.Address.Count(UInt(mappingLen.underlying))
+
+            let region: Memory.Map.Region
+            do throws(Self.Error) {
+                region = try Self.File.map(
                     descriptor: fileHandle,
                     offset: alignedOffset,
-                    length: mappingLen,
+                    length: mappingLenCount,
                     protection: access.kernelProtection,
                     copyOnWrite: sharing == .private
                 )
@@ -279,36 +215,21 @@ extension Memory.Map {
                 throw Memory.Error(from: error)
             }
 
-            // Acquire lock if needed
-            let lockToken: Memory.Lock.Token?
-            if case .coordinated(let kind, let scope) = effectiveSafety {
-                let lockRange = computeLockRange(
-                    scope: scope,
-                    alignedOffset: alignedOffset,
-                    mappingLength: mappingLen
-                )
-                do {
-                    lockToken = try Memory.Lock.Token(
-                        descriptor: fileHandle,
-                        range: lockRange,
-                        kind: kind
-                    )
-                } catch {
-                    try? Kernel.Memory.Map.unmap(region)
-                    throw .lock(error)
-                }
-            } else {
-                lockToken = nil
-            }
+            let lockToken: Memory.Lock.Token? = nil  // Windows lock acquisition deferred
 
             return Self(
                 region: region,
-                offsetDelta: delta,
-                userLength: userLen,
+                offsetDelta: Memory.Address.Count(UInt(delta.underlying)),
+                userLength: Memory.Address.Count(UInt(userLen.underlying)),
                 access: access,
                 sharing: sharing,
                 safety: effectiveSafety,
-                lockToken: lockToken
+                lockToken: lockToken,
+                unmap: { region in
+                    do throws(Self.Error) {
+                        try Self.unmap(region)
+                    } catch {}
+                }
             )
         }
     }
@@ -319,14 +240,6 @@ extension Memory.Map {
 #if !os(Windows)
     extension Memory.Map {
         /// Creates an anonymous memory mapping (not backed by a file).
-        ///
-        /// Anonymous mappings are backed by swap/memory only.
-        ///
-        /// - Parameters:
-        ///   - length: The number of bytes to map.
-        ///   - access: The access mode (default: `[.read, .write]`).
-        ///   - sharing: The sharing mode (default: `.private`).
-        /// - Throws: `Memory.Error` if mapping fails.
         public init(
             anonymousLength length: Kernel.File.Size,
             access: Access = [.read, .write],
@@ -334,12 +247,13 @@ extension Memory.Map {
         ) throws(Memory.Error) {
             try access.validate()
 
-            let mappingLen = Memory.Page.align.up(length)
+            let mappingLen = System.Page.align.up(length)
+            let mappingLenCount = Memory.Address.Count(UInt(mappingLen.underlying))
 
-            let region: Kernel.Memory.Map.Region
-            do throws(Kernel.Memory.Map.Error) {
-                region = try Kernel.Memory.Map.Anonymous.map(
-                    length: mappingLen,
+            let region: Memory.Map.Region
+            do throws(Self.Error) {
+                region = try Self.Anonymous.map(
+                    length: mappingLenCount,
                     protection: access.kernelProtection,
                     shared: sharing == .shared
                 )
@@ -347,26 +261,23 @@ extension Memory.Map {
                 throw Memory.Error(from: error)
             }
 
-            self.region = region
-            self.offsetDelta = .zero
-            self.userLength = length
-            self.access = access
-            self.sharing = sharing
-            self.safety = .unchecked
-            self.lockToken = nil
+            self.init(
+                region: region,
+                offsetDelta: .zero,
+                userLength: Memory.Address.Count(UInt(length.underlying)),
+                access: access,
+                sharing: sharing,
+                safety: .unchecked,
+                lockToken: nil,
+                unmap: { region in
+                    do throws(Self.Error) {
+                        try Self.unmap(region)
+                    } catch {}
+                }
+            )
         }
 
-        /// Creates an anonymous memory mapping (not backed by a file).
-        ///
-        /// This static factory method provides API parity with Windows.
-        /// It is equivalent to calling the throwing initializer directly.
-        ///
-        /// - Parameters:
-        ///   - length: The number of bytes to map.
-        ///   - access: The access mode (default: `[.read, .write]`).
-        ///   - sharing: The sharing mode (default: `.private`).
-        /// - Returns: A new anonymous `Map`.
-        /// - Throws: `Memory.Error` if mapping fails.
+        /// Static factory for anonymous mapping (API parity with Windows).
         public static func anonymous(
             length: Kernel.File.Size,
             access: Access = [.read, .write],
@@ -381,17 +292,6 @@ extension Memory.Map {
 
 #if os(Windows)
     extension Memory.Map {
-        /// Creates an anonymous memory mapping (backed by the system pagefile).
-        ///
-        /// This is a static factory method that works around Swift compiler bugs
-        /// on Windows where throwing inits on ~Copyable structs generate incorrect SIL.
-        ///
-        /// - Parameters:
-        ///   - length: The number of bytes to map.
-        ///   - access: The access mode (default: `[.read, .write]`).
-        ///   - sharing: The sharing mode (default: `.private`).
-        /// - Returns: A new anonymous `Region`.
-        /// - Throws: `Memory.Error` if mapping fails.
         public static func anonymous(
             length: Kernel.File.Size,
             access: Access = [.read, .write],
@@ -399,12 +299,13 @@ extension Memory.Map {
         ) throws(Memory.Error) -> Self {
             try access.validate()
 
-            let mappingLen = Memory.Page.align.up(length)
+            let mappingLen = System.Page.align.up(length)
+            let mappingLenCount = Memory.Address.Count(UInt(mappingLen.underlying))
 
-            let region: Kernel.Memory.Map.Region
-            do {
-                region = try Kernel.Memory.Map.Anonymous.map(
-                    length: mappingLen,
+            let region: Memory.Map.Region
+            do throws(Self.Error) {
+                region = try Self.Anonymous.map(
+                    length: mappingLenCount,
                     protection: access.kernelProtection
                 )
             } catch {
@@ -414,11 +315,16 @@ extension Memory.Map {
             return Self(
                 region: region,
                 offsetDelta: .zero,
-                userLength: length,
+                userLength: Memory.Address.Count(UInt(length.underlying)),
                 access: access,
                 sharing: sharing,
                 safety: .unchecked,
-                lockToken: nil
+                lockToken: nil,
+                unmap: { region in
+                    do throws(Self.Error) {
+                        try Self.unmap(region)
+                    } catch {}
+                }
             )
         }
     }
@@ -430,31 +336,9 @@ extension Memory.Map {
     extension Memory.Map {
         /// Creates a memory-mapped region from a file descriptor with a specific mmap offset.
         ///
-        /// This is used for special mappings like io_uring ring buffers where the
-        /// offset is not a file offset but a magic value that selects a specific region.
-        ///
-        /// ## io_uring Example
-        ///
-        /// ```swift
-        /// // Map the io_uring SQ ring
-        /// let sqRing = try Memory.Map(
-        ///     fileDescriptor: ringFd,
-        ///     mmapOffset: Kernel.IOUring.MmapOffset.sqRing,
-        ///     length: sqRingSize,
-        ///     access: [.read, .write],
-        ///     sharing: .shared
-        /// )
-        /// ```
-        ///
-        /// - Parameters:
-        ///   - fileDescriptor: The file descriptor to map (e.g., io_uring fd).
-        ///   - mmapOffset: The mmap offset (e.g., `Kernel.IOUring.MmapOffset.sqRing`).
-        ///   - length: Number of bytes to map.
-        ///   - access: The access mode (default: `[.read, .write]`).
-        ///   - sharing: The sharing mode (default: `.shared`).
-        /// - Throws: `Memory.Error` if mapping fails.
+        /// Used for special mappings like io_uring ring buffers.
         public init(
-            fileDescriptor: Kernel.Descriptor,
+            fileDescriptor: borrowing Kernel.Descriptor,
             mmapOffset: Kernel.File.Offset,
             length: Kernel.File.Size,
             access: Access = [.read, .write],
@@ -462,28 +346,38 @@ extension Memory.Map {
         ) throws(Memory.Error) {
             try access.validate()
 
-            let mappingLen = Memory.Page.align.up(length)
+            let mappingLen = System.Page.align.up(length)
+            let mappingLenCount = Memory.Address.Count(UInt(mappingLen.underlying))
 
-            let baseAddress: Kernel.Memory.Address
-            do {
-                baseAddress = try Kernel.Memory.Map.map(
-                    length: mappingLen,
+            let baseAddress: Memory.Address
+            do throws(Self.Error) {
+                baseAddress = try Self.map(
+                    length: mappingLenCount,
                     protection: access.kernelProtection,
-                    flags: sharing.kernelFlags,
-                    fd: fileDescriptor,
+                    flags: sharing.kernelOptions,
+                    descriptor: fileDescriptor,
                     offset: mmapOffset
                 )
             } catch {
                 throw Memory.Error(from: error)
             }
 
-            self.region = Kernel.Memory.Map.Region(base: baseAddress, length: mappingLen)
-            self.offsetDelta = .zero
-            self.userLength = length
-            self.access = access
-            self.sharing = sharing
-            self.safety = .unchecked
-            self.lockToken = nil
+            let region = Self.Region(base: baseAddress, length: mappingLenCount)
+
+            self.init(
+                region: region,
+                offsetDelta: .zero,
+                userLength: Memory.Address.Count(UInt(length.underlying)),
+                access: access,
+                sharing: sharing,
+                safety: .unchecked,
+                lockToken: nil,
+                unmap: { region in
+                    do throws(Self.Error) {
+                        try Self.unmap(region)
+                    } catch {}
+                }
+            )
         }
     }
 #endif

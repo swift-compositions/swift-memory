@@ -9,29 +9,33 @@
 //
 // ===----------------------------------------------------------------------===//
 
-import Test_Primitives
 import Testing
 
 @testable import Memory
 
-extension Memory.Page.Lock {
-    #TestSuites
+extension System.Page.Lock {
+    enum Test {
+        @Suite struct Unit {}
+        @Suite struct `Edge Case` {}
+        @Suite struct Integration {}
+        @Suite(.serialized) struct Performance {}
+    }
 }
 
 // MARK: - Unit Tests
 
-extension Memory.Page.Lock.Test.Unit {
+extension System.Page.Lock.Test.Unit {
     // Platform capabilities (isProcessWideLockingSupported) are tested in swift-kernel
 
     #if os(macOS) || os(Linux)
-        @Test("lock and unlock memory map")
-        func lockAndUnlockMemoryMap() throws {
+        @Test
+        func `lock and unlock memory map`() throws {
             let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
 
             // Note: This may fail on macOS without entitlement or on Linux with low RLIMIT_MEMLOCK
-            do {
-                try Memory.Page.Lock.lock(map)
-                try Memory.Page.Lock.unlock(map)
+            do throws(Memory.Error) {
+                try System.Page.Lock.lock(map)
+                try System.Page.Lock.unlock(map)
             } catch {
                 // Expected on systems with restricted mlock
             }
@@ -39,8 +43,8 @@ extension Memory.Page.Lock.Test.Unit {
             map.unmap()
         }
 
-        @Test("lock and unlock by address")
-        func lockAndUnlockByAddress() throws {
+        @Test
+        func `lock and unlock by address`() throws {
             let map = try Memory.Map(anonymousLength: 4096, access: [.read, .write])
 
             guard let base = map.baseAddress else {
@@ -52,9 +56,9 @@ extension Memory.Page.Lock.Test.Unit {
             let length = map.length
 
             // Note: This may fail on macOS without entitlement
-            do {
-                try Memory.Page.Lock.lock(address: base, size: length)
-                try Memory.Page.Lock.unlock(address: base, size: length)
+            do throws(Memory.Error) {
+                try System.Page.Lock.lock(address: base, size: length)
+                try System.Page.Lock.unlock(address: base, size: length)
             } catch {
                 // Expected on systems with restricted mlock
             }
@@ -62,17 +66,17 @@ extension Memory.Page.Lock.Test.Unit {
             map.unmap()
         }
 
-        @Test("lock all flags are accessible")
-        func lockAllFlagsAccessible() {
+        @Test
+        func `lock all flags are accessible`() {
             // Just verify the types are accessible
-            let _: Memory.Page.Lock.All.Flags = .current
-            let _: Memory.Page.Lock.All.Flags = .future
+            let _: System.Page.Lock.All.Options = .current
+            let _: System.Page.Lock.All.Options = .future
         }
     #endif
 
     #if os(Windows)
-        @Test("lock and unlock memory map (Windows)")
-        func lockAndUnlockMemoryMapWindows() throws {
+        @Test
+        func `lock and unlock memory map (Windows)`() throws {
             let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
 
             guard let base = map.baseAddress else {
@@ -84,9 +88,9 @@ extension Memory.Page.Lock.Test.Unit {
             let length = map.length
 
             // Note: VirtualLock may fail due to working set quota
-            do {
-                try Memory.Page.Lock.lock(address: base, size: length)
-                try Memory.Page.Lock.unlock(address: base, size: length)
+            do throws(Memory.Error) {
+                try System.Page.Lock.lock(address: base, size: length)
+                try System.Page.Lock.unlock(address: base, size: length)
             } catch {
                 // Expected on systems with restricted working set
             }
@@ -94,8 +98,8 @@ extension Memory.Page.Lock.Test.Unit {
             map.unmap()
         }
 
-        @Test("lock and unlock by address (Windows)")
-        func lockAndUnlockByAddressWindows() throws {
+        @Test
+        func `lock and unlock by address (Windows)`() throws {
             let map = try Memory.Map.anonymous(length: 4096, access: [.read, .write])
 
             guard let base = map.baseAddress else {
@@ -107,9 +111,9 @@ extension Memory.Page.Lock.Test.Unit {
             let length = map.length
 
             // Note: VirtualLock may fail due to working set quota
-            do {
-                try Memory.Page.Lock.lock(address: base, size: length)
-                try Memory.Page.Lock.unlock(address: base, size: length)
+            do throws(Memory.Error) {
+                try System.Page.Lock.lock(address: base, size: length)
+                try System.Page.Lock.unlock(address: base, size: length)
             } catch {
                 // Expected on systems with restricted working set
             }
@@ -121,7 +125,7 @@ extension Memory.Page.Lock.Test.Unit {
 
 // MARK: - Edge Case Tests
 
-extension Memory.Page.Lock.Test.EdgeCase {
+extension System.Page.Lock.Test.`Edge Case` {
     // Note: "lock on unmapped throws" and "unlock on unmapped throws" tests
     // are not needed because Memory.Map is ~Copyable. Once unmap() consumes
     // the map, the compiler prevents any further access - making these
@@ -130,7 +134,7 @@ extension Memory.Page.Lock.Test.EdgeCase {
 
 // MARK: - Performance Tests
 
-extension Memory.Page.Lock.Test.Performance {
+extension System.Page.Lock.Test.Performance {
     // Page locking is a system call with variable behavior
     // No meaningful performance test
 }

@@ -9,64 +9,68 @@
 //
 // ===----------------------------------------------------------------------===//
 
-import Test_Primitives
 import Testing
 
 @testable import Memory
 
 extension Memory.Map.Access {
-    #TestSuites
+    enum Test {
+        @Suite struct Unit {}
+        @Suite struct `Edge Case` {}
+        @Suite struct Integration {}
+        @Suite(.serialized) struct Performance {}
+    }
 }
 
 // MARK: - Unit Tests
 
 extension Memory.Map.Access.Test.Unit {
-    @Test("read permission")
-    func readPermission() {
+    @Test
+    func `read permission`() {
         let access: Memory.Map.Access = .read
         #expect(access.allows.read)
         #expect(!access.allows.write)
     }
 
-    @Test("write permission")
-    func writePermission() {
+    @Test
+    func `write permission`() {
         let access: Memory.Map.Access = .write
         #expect(!access.allows.read)
         #expect(access.allows.write)
     }
 
-    @Test("read-write permission")
-    func readWritePermission() {
+    @Test
+    func `read-write permission`() {
         let access: Memory.Map.Access = [.read, .write]
         #expect(access.allows.read)
         #expect(access.allows.write)
     }
 
-    @Test("read-only validates")
-    func readOnlyValidates() throws {
+    @Test
+    func `read-only validates`() throws {
         let access: Memory.Map.Access = .read
         try access.validate()
         // Should not throw
     }
 
-    @Test("read-write validates")
-    func readWriteValidates() throws {
+    @Test
+    func `read-write validates`() throws {
         let access: Memory.Map.Access = [.read, .write]
         try access.validate()
         // Should not throw
     }
 
-    // Kernel.Memory.Map.Protection conversions are tested in swift-kernel
+    // Memory.Map.Protection conversions are tested in swift-kernel
 
-    @Test("empty access")
-    func emptyAccess() {
+    @Test
+    func `empty access`() {
         let access: Memory.Map.Access = []
         #expect(!access.allows.read)
         #expect(!access.allows.write)
     }
 
-    @Test("access is equatable")
-    func accessIsEquatable() {
+    @Test
+    func `access is equatable`() {
         let a: Memory.Map.Access = .read
         let b: Memory.Map.Access = .read
         let c: Memory.Map.Access = [.read, .write]
@@ -75,8 +79,8 @@ extension Memory.Map.Access.Test.Unit {
         #expect(a != c)
     }
 
-    @Test("access is hashable")
-    func accessIsHashable() {
+    @Test
+    func `access is hashable`() {
         let access: Memory.Map.Access = .read
         let set: Set<Memory.Map.Access> = [access]
         #expect(set.contains(.read))
@@ -85,9 +89,9 @@ extension Memory.Map.Access.Test.Unit {
 
 // MARK: - Edge Case Tests
 
-extension Memory.Map.Access.Test.EdgeCase {
-    @Test("write-only validation fails")
-    func writeOnlyValidationFails() {
+extension Memory.Map.Access.Test.`Edge Case` {
+    @Test
+    func `write-only validation fails`() {
         let access: Memory.Map.Access = .write
 
         #expect(throws: Memory.Error.self) {
@@ -95,8 +99,8 @@ extension Memory.Map.Access.Test.EdgeCase {
         }
     }
 
-    @Test("empty access validation succeeds")
-    func emptyAccessValidationSucceeds() throws {
+    @Test
+    func `empty access validation succeeds`() throws {
         let access: Memory.Map.Access = []
         // Empty access is technically valid (no write without read)
         try access.validate()
