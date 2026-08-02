@@ -258,7 +258,7 @@ extension Memory.Shared.Mode.Create {
         ///
         /// - Parameter descriptor: The descriptor to close.
         /// - Throws: `Memory.Error` if the operation fails.
-        public static func close(_ descriptor: Kernel.Descriptor) throws(Memory.Error) {
+        public static func close(_ descriptor: consuming Kernel.Descriptor) throws(Memory.Error) {
             do throws(Self.Error) {
                 try Self.close(descriptor)
             } catch {
