@@ -25,7 +25,7 @@ extension Memory.Allocation {
             let span = max - min + 1
             let bucketSize = Swift.max(1, span / bucketCount)
             var result: [Bucket] = []
-            for i in 0..<bucketCount {
+            (0..<bucketCount).forEach { i in
                 let lo = min + i * bucketSize
                 let hi = (i == bucketCount - 1) ? max + 1 : lo + bucketSize
                 let count = sorted.filter { $0 >= lo && $0 < hi }.count
