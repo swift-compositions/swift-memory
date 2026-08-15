@@ -93,7 +93,12 @@ extension Memory.Map {
             guard let base = unsafe baseAddress else {
                 preconditionFailure("Mapping is not valid")
             }
-            return Byte(unsafe base.load(fromByteOffset: Int(bitPattern: index.underlying.rawValue), as: UInt8.self))
+            return Byte(
+                unsafe base.load(
+                    fromByteOffset: Int(bitPattern: index.underlying.rawValue),
+                    as: UInt8.self
+                )
+            )
         }
         nonmutating set {
             precondition(access.allows.write, "Mapping does not allow writes")
@@ -101,7 +106,11 @@ extension Memory.Map {
             guard let base = unsafe mutableBaseAddress else {
                 preconditionFailure("Mapping is not valid")
             }
-            unsafe base.storeBytes(of: newValue.underlying, toByteOffset: Int(bitPattern: index.underlying.rawValue), as: UInt8.self)
+            unsafe base.storeBytes(
+                of: newValue.underlying,
+                toByteOffset: Int(bitPattern: index.underlying.rawValue),
+                as: UInt8.self
+            )
         }
     }
 
@@ -112,7 +121,10 @@ extension Memory.Map {
         guard let base = unsafe baseAddress else {
             preconditionFailure("Mapping is not valid")
         }
-        let buffer = unsafe UnsafeRawBufferPointer(start: base, count: Int(bitPattern: _userLength.underlying.rawValue))
+        let buffer = unsafe UnsafeRawBufferPointer(
+            start: base,
+            count: Int(bitPattern: _userLength.underlying.rawValue)
+        )
         return try unsafe body(buffer)
     }
 
@@ -124,7 +136,10 @@ extension Memory.Map {
         guard let base = unsafe mutableBaseAddress else {
             preconditionFailure("Mapping is not valid")
         }
-        let buffer = unsafe UnsafeMutableRawBufferPointer(start: base, count: Int(bitPattern: _userLength.underlying.rawValue))
+        let buffer = unsafe UnsafeMutableRawBufferPointer(
+            start: base,
+            count: Int(bitPattern: _userLength.underlying.rawValue)
+        )
         return try unsafe body(buffer)
     }
 }
@@ -199,7 +214,9 @@ extension Memory.Map {
     /// Mutable base address (only valid if access includes write).
     public var mutableBaseAddress: UnsafeMutableRawPointer? {
         guard access.allows.write, let base = mappingBaseAddress else { return nil }
-        return unsafe base.mutablePointer.advanced(by: Int(bitPattern: _offsetDelta.underlying.rawValue))
+        return unsafe base.mutablePointer.advanced(
+            by: Int(bitPattern: _offsetDelta.underlying.rawValue)
+        )
     }
 
     /// The length of the mapped region visible to the user.
@@ -230,6 +247,7 @@ extension Memory.Map {
     /// A textual representation for debugging.
     public var debugDescription: Swift.String {
         let status = isMapped ? "mapped" : "unmapped"
-        return "Map(\(status), length: \(_userLength), access: \(access), sharing: \(sharing), safety: \(safety))"
+        return
+            "Map(\(status), length: \(_userLength), access: \(access), sharing: \(sharing), safety: \(safety))"
     }
 }
