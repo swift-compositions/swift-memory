@@ -497,7 +497,10 @@ extension Memory.Map.Test.Unit {
             let firstByte = map[0]
 
             // Remap to second half
-            map = try map.remap(fileDescriptor: tempFile.descriptor, range: .bytes(offset: 4096, length: 4096))
+            map = try map.remap(
+                fileDescriptor: tempFile.descriptor,
+                range: .bytes(offset: 4096, length: 4096)
+            )
 
             let secondByte = map[0]
 

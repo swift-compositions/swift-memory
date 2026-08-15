@@ -89,7 +89,10 @@ extension System.Page.Lock {
     ///   - address: The starting address of the memory range.
     ///   - size: The number of bytes to lock.
     /// - Throws: `Memory.Error` if locking fails.
-    public static func lock(address: UnsafeRawPointer, size: Memory.Address.Count) throws(Memory.Error) {
+    public static func lock(
+        address: UnsafeRawPointer,
+        size: Memory.Address.Count
+    ) throws(Memory.Error) {
         do throws(Memory.Lock.Error) {
             try unsafe Memory.Lock.lock(address: address, length: size)
         } catch {
@@ -103,7 +106,10 @@ extension System.Page.Lock {
     ///   - address: The starting address of the memory range.
     ///   - size: The number of bytes to unlock.
     /// - Throws: `Memory.Error` if unlocking fails.
-    public static func unlock(address: UnsafeRawPointer, size: Memory.Address.Count) throws(Memory.Error) {
+    public static func unlock(
+        address: UnsafeRawPointer,
+        size: Memory.Address.Count
+    ) throws(Memory.Error) {
         do throws(Memory.Lock.Error) {
             try unsafe Memory.Lock.unlock(address: address, length: size)
         } catch {
