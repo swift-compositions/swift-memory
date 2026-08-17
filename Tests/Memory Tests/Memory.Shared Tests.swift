@@ -173,7 +173,10 @@ extension Memory.Shared.Test.Unit {
             )
             defer { try? Memory.Shared.close(shm) }
 
-            #expect(shm.isValid)
+            // Hoisted: `#expect` expands a property access through a generic
+            // that requires Copyable, and Kernel.Descriptor is ~Copyable.
+            let shmIsValid = shm.isValid
+            #expect(shmIsValid)
         }
 
         @Test
@@ -204,9 +207,13 @@ extension Memory.Shared.Test.Unit {
             // Open existing (without size, uses open(name:mode:))
             let shm2 = try Memory.Shared.open(name: name, mode: [.read, .write])
 
-            // Both should be valid
-            #expect(shm1.isValid)
-            #expect(shm2.isValid)
+            // Both should be valid. Hoisted: `#expect` expands a property
+            // access through a generic that requires Copyable, and
+            // Kernel.Descriptor is ~Copyable.
+            let shm1IsValid = shm1.isValid
+            let shm2IsValid = shm2.isValid
+            #expect(shm1IsValid)
+            #expect(shm2IsValid)
 
             try Memory.Shared.close(shm2)
             try Memory.Shared.close(shm1)
