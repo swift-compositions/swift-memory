@@ -171,12 +171,17 @@ extension Memory.Shared.Test.Unit {
                 size: 4096,
                 mode: .create.exclusive
             )
-            defer { try? Memory.Shared.close(shm) }
+            // No `defer`: closing consumes the descriptor, and a noncopyable
+            // value cannot be consumed from an escaping closure. Nothing
+            // between here and the close can throw, and the descriptor's own
+            // deinit closes the handle on any path that skips it.
 
             // Hoisted: `#expect` expands a property access through a generic
             // that requires Copyable, and Kernel.Descriptor is ~Copyable.
             let shmIsValid = shm.isValid
             #expect(shmIsValid)
+
+            try Memory.Shared.close(shm)
         }
 
         @Test
