@@ -202,18 +202,20 @@ extension Memory.Map {
 
             let mappingLenCount = Memory.Address.Count(UInt(mappingLen.underlying))
 
-            let region: Memory.Map.Region
+            let baseAddress: Memory.Address
             do throws(Self.Error) {
-                region = try Self.File.map(
-                    descriptor: fileHandle,
-                    offset: alignedOffset,
+                baseAddress = try Self.map(
+                    fd: fileHandle,
                     length: mappingLenCount,
                     protection: access.kernelProtection,
-                    copyOnWrite: sharing == .private
+                    flags: sharing.kernelOptions,
+                    offset: alignedOffset
                 )
             } catch {
                 throw Memory.Error(from: error)
             }
+
+            let region = Self.Region(base: baseAddress, length: mappingLenCount)
 
             let lockToken: Memory.Lock.Token? = nil  // Windows lock acquisition deferred
 
@@ -226,8 +228,13 @@ extension Memory.Map {
                 safety: effectiveSafety,
                 lockToken: lockToken,
                 unmap: { region in
+                    // File-backed view: released with UnmapViewOfFile.
                     do throws(Self.Error) {
-                        try Self.unmap(region)
+                        try Self.unmap(
+                            addr: region.base,
+                            length: region.length,
+                            isAnonymous: false
+                        )
                     } catch {}
                 }
             )
@@ -321,8 +328,14 @@ extension Memory.Map {
                 safety: .unchecked,
                 lockToken: nil,
                 unmap: { region in
+                    // Anonymous reservation from VirtualAlloc: released with
+                    // VirtualFree, not UnmapViewOfFile.
                     do throws(Self.Error) {
-                        try Self.unmap(region)
+                        try Self.unmap(
+                            addr: region.base,
+                            length: region.length,
+                            isAnonymous: true
+                        )
                     } catch {}
                 }
             )
