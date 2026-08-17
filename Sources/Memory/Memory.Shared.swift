@@ -257,13 +257,15 @@ extension Memory.Shared.Mode.Create {
         ///   but the object persists until all mappings are unmapped.
         ///
         /// - Parameter descriptor: The descriptor to close.
-        /// - Throws: `Memory.Error` if the operation fails.
-        public static func close(_ descriptor: consuming Kernel.Descriptor) throws(Memory.Error) {
-            do throws(Self.Error) {
-                try Self.close(descriptor)
-            } catch {
-                throw Memory.Error(from: error)
-            }
+        /// - Throws: `Kernel.Close.Error` if the handle cannot be closed.
+        ///
+        /// Explicit close with error reporting is owned by `Kernel.Close`; this
+        /// spelling exists so a caller who reached the descriptor through
+        /// `Memory.Shared.open` finds the release in the same namespace.
+        public static func close(
+            _ descriptor: consuming Kernel.Descriptor
+        ) throws(Kernel.Close.Error) {
+            try Kernel.Close.close(descriptor)
         }
     }
 

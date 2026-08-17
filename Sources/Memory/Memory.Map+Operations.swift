@@ -24,10 +24,14 @@ extension Memory.Map {
         // Release lock token (its release closure unlocks + closes the dup'd fd)
         _lockToken?.release()
 
-        // Unmap the region via the witness closure (resolves to L2 syscall on active platform)
-        do throws(Self.Error) {
-            try Self.unmap(currentRegion)
-        } catch {}
+        // Unmap the region via the witness closure injected at construction.
+        //
+        // The witness — not a direct `Self.unmap` call — is the only correct
+        // teardown: it is the single place that knows how this particular
+        // mapping was created. On Windows a file-backed view is released with
+        // `UnmapViewOfFile` and an anonymous reservation with `VirtualFree`,
+        // a distinction `Region` (base + length only) cannot carry.
+        _unmap(currentRegion)
 
         // Mark unmapped so deinit becomes a no-op
         _region = nil
