@@ -135,7 +135,7 @@ extension Memory.Shared.Mode.Create {
             // withCString also requires Copyable return, so capture via side channel.
             var fd: Kernel.Descriptor? = nil
             var openError: Memory.Shared.Error? = nil
-            unsafe name.withCString { namePtr in
+            name.withCString { namePtr in
                 do throws(Self.Error) {
                     fd = try unsafe Self.open(
                         name: namePtr,
@@ -165,7 +165,7 @@ extension Memory.Shared.Mode.Create {
         /// - Throws: `Memory.Error` if the operation fails.
         public static func unlink(name: Swift.String) throws(Memory.Error) {
             var unlinkError: Memory.Shared.Error?
-            unsafe name.withCString { namePtr in
+            name.withCString { namePtr in
                 do throws(Self.Error) {
                     try unsafe Self.unlink(name: namePtr)
                 } catch {
