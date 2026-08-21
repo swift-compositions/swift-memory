@@ -1,14 +1,3 @@
-// ===----------------------------------------------------------------------===//
-//
-// This source file is part of the swift-memory open source project
-//
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
-// Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// ===----------------------------------------------------------------------===//
-
 import Testing
 
 @testable import Memory
@@ -21,8 +10,6 @@ extension Memory.Map.Sharing {
         @Suite(.serialized) struct Performance {}
     }
 }
-
-// MARK: - Unit Tests
 
 extension Memory.Map.Sharing.Test.Unit {
     @Test
@@ -46,8 +33,6 @@ extension Memory.Map.Sharing.Test.Unit {
         #expect(a == b)
         #expect(a != c)
     }
-
-    // Memory.Map.Sharing conversions are tested in swift-kernel
 
     #if os(macOS) || os(Linux)
         @Test
@@ -76,14 +61,10 @@ extension Memory.Map.Sharing.Test.Unit {
     #endif
 }
 
-// MARK: - Edge Case Tests
-
 extension Memory.Map.Sharing.Test.`Edge Case` {
-    // Sharing is a simple enum with no edge cases
+
 }
 
-// MARK: - Performance Tests
-
 extension Memory.Map.Sharing.Test.Performance {
-    // Sharing is a simple enum with no performance-critical operations
+
 }

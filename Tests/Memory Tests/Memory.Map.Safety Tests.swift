@@ -1,14 +1,3 @@
-// ===----------------------------------------------------------------------===//
-//
-// This source file is part of the swift-memory open source project
-//
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
-// Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// ===----------------------------------------------------------------------===//
-
 import Kernel
 import Testing
 
@@ -23,14 +12,12 @@ extension Memory.Map.Safety {
     }
 }
 
-// MARK: - Unit Tests
-
 extension Memory.Map.Safety.Test.Unit {
     @Test
     func `unchecked safety`() {
         let safety = Memory.Map.Safety.unchecked
         if case .unchecked = safety {
-            // Correct
+
         } else {
             Issue.record("Expected unchecked")
         }
@@ -129,14 +116,10 @@ extension Memory.Map.Safety.Test.Unit {
     }
 }
 
-// MARK: - Edge Case Tests
-
 extension Memory.Map.Safety.Test.`Edge Case` {
-    // Safety is a simple enum with no edge cases
+
 }
 
-// MARK: - Performance Tests
-
 extension Memory.Map.Safety.Test.Performance {
-    // Safety is a simple enum with no performance-critical operations
+
 }

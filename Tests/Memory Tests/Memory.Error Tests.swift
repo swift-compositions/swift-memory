@@ -1,14 +1,3 @@
-// ===----------------------------------------------------------------------===//
-//
-// This source file is part of the swift-memory open source project
-//
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
-// Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// ===----------------------------------------------------------------------===//
-
 import Kernel
 import Testing
 
@@ -22,8 +11,6 @@ extension Memory.Error {
         @Suite(.serialized) struct Performance {}
     }
 }
-
-// MARK: - Unit Tests
 
 extension Memory.Error.Test.Unit {
     @Test
@@ -64,7 +51,7 @@ extension Memory.Error.Test.Unit {
         let kernelError = Memory.Map.Error.map(.posix(22))
         let error = Memory.Error(from: kernelError)
         if case .map = error {
-            // Correct case
+
         } else {
             Issue.record("Expected .map case")
         }
@@ -75,7 +62,7 @@ extension Memory.Error.Test.Unit {
         let kernelError = Memory.Lock.Error.lock(.posix(1))
         let error = Memory.Error(from: kernelError)
         if case .lock = error {
-            // Correct case
+
         } else {
             Issue.record("Expected .lock case")
         }
@@ -93,7 +80,7 @@ extension Memory.Error.Test.Unit {
             let kernelError = Memory.Shared.Error.open(.posix(2))
             let error = Memory.Error(from: kernelError)
             if case .shared = error {
-                // Correct case
+
             } else {
                 Issue.record("Expected .shared case")
             }
@@ -101,14 +88,10 @@ extension Memory.Error.Test.Unit {
     #endif
 }
 
-// MARK: - Edge Case Tests
-
 extension Memory.Error.Test.`Edge Case` {
-    // Error types have no edge cases to test
+
 }
 
-// MARK: - Performance Tests
-
 extension Memory.Error.Test.Performance {
-    // Error types have no performance-critical operations
+
 }

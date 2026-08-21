@@ -1,29 +1,8 @@
-// ===----------------------------------------------------------------------===//
-//
-// This source file is part of the swift-memory open source project
-//
-// Copyright (c) 2024-2026 Coen ten Thije Boonkkamp and the swift-memory project authors
-// Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// ===----------------------------------------------------------------------===//
-
 public import Kernel
-
-// MARK: - File-backed Initialization (POSIX)
 
 #if !os(Windows)
     extension Memory.Map {
-        /// Creates a memory-mapped region from a file descriptor.
-        ///
-        /// - Parameters:
-        ///   - fileDescriptor: The POSIX file descriptor to map.
-        ///   - range: The range to map (offset will be aligned to allocation granularity).
-        ///   - access: The access mode (default: `.read`).
-        ///   - sharing: The sharing mode (default: `.shared`).
-        ///   - safety: The safety mode (defaults based on access).
-        /// - Throws: `Memory.Error` if mapping fails.
+
         public init(
             fileDescriptor: borrowing Kernel.Descriptor,
             range: Range,
@@ -59,8 +38,6 @@ public import Kernel
             let totalLength = userLen + delta
             let mappingLen = System.Page.align.up(totalLength)
 
-            // Cross-domain conversion: file-domain Kernel.File.Size →
-            // memory-domain Memory.Address.Count at the file→memory boundary.
             let mappingLenCount = Memory.Address.Count(UInt(mappingLen.underlying))
 
             let baseAddress: Memory.Address
@@ -117,9 +94,6 @@ public import Kernel
             )
         }
 
-        /// Creates a memory-mapped region from a file descriptor.
-        ///
-        /// Static factory for API parity with Windows.
         public static func open(
             fileDescriptor: borrowing Kernel.Descriptor,
             range: Range,
@@ -138,10 +112,8 @@ public import Kernel
     }
 #endif
 
-// MARK: - Lock Range Computation (Shared)
-
 extension Memory.Map {
-    /// Computes the lock range based on scope.
+
     static func computeLockRange(
         scope: Safety.Scope,
         alignedOffset: Kernel.File.Offset,
@@ -160,8 +132,6 @@ extension Memory.Map {
         }
     }
 }
-
-// MARK: - File-backed Initialization (Windows)
 
 #if os(Windows)
     extension Memory.Map {
@@ -217,7 +187,7 @@ extension Memory.Map {
 
             let region = Self.Region(base: baseAddress, length: mappingLenCount)
 
-            let lockToken: Memory.Lock.Token? = nil  // Windows lock acquisition deferred
+            let lockToken: Memory.Lock.Token? = nil
 
             return Self(
                 region: region,
@@ -228,7 +198,7 @@ extension Memory.Map {
                 safety: effectiveSafety,
                 lockToken: lockToken,
                 unmap: { region in
-                    // File-backed view: released with UnmapViewOfFile.
+
                     do throws(Self.Error) {
                         try Self.unmap(
                             addr: region.base,
@@ -242,11 +212,9 @@ extension Memory.Map {
     }
 #endif
 
-// MARK: - Anonymous Mapping (POSIX)
-
 #if !os(Windows)
     extension Memory.Map {
-        /// Creates an anonymous memory mapping (not backed by a file).
+
         public init(
             anonymousLength length: Kernel.File.Size,
             access: Access = [.read, .write],
@@ -284,7 +252,6 @@ extension Memory.Map {
             )
         }
 
-        /// Static factory for anonymous mapping (API parity with Windows).
         public static func anonymous(
             length: Kernel.File.Size,
             access: Access = [.read, .write],
@@ -294,8 +261,6 @@ extension Memory.Map {
         }
     }
 #endif
-
-// MARK: - Anonymous Mapping (Windows)
 
 #if os(Windows)
     extension Memory.Map {
@@ -328,8 +293,7 @@ extension Memory.Map {
                 safety: .unchecked,
                 lockToken: nil,
                 unmap: { region in
-                    // Anonymous reservation from VirtualAlloc: released with
-                    // VirtualFree, not UnmapViewOfFile.
+
                     do throws(Self.Error) {
                         try Self.unmap(
                             addr: region.base,
@@ -343,13 +307,9 @@ extension Memory.Map {
     }
 #endif
 
-// MARK: - Special Offset Mapping (Linux)
-
 #if os(Linux)
     extension Memory.Map {
-        /// Creates a memory-mapped region from a file descriptor with a specific mmap offset.
-        ///
-        /// Used for special mappings like io_uring ring buffers.
+
         public init(
             fileDescriptor: borrowing Kernel.Descriptor,
             mmapOffset: Kernel.File.Offset,

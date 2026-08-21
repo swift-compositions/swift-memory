@@ -1,14 +1,3 @@
-// ===----------------------------------------------------------------------===//
-//
-// This source file is part of the swift-memory open source project
-//
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
-// Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// ===----------------------------------------------------------------------===//
-
 import Kernel
 import Testing
 
@@ -22,8 +11,6 @@ extension Memory.Map.Range {
         @Suite(.serialized) struct Performance {}
     }
 }
-
-// MARK: - Unit Tests
 
 extension Memory.Map.Range.Test.Unit {
     @Test
@@ -76,14 +63,10 @@ extension Memory.Map.Range.Test.Unit {
     }
 }
 
-// MARK: - Edge Case Tests
-
 extension Memory.Map.Range.Test.`Edge Case` {
-    // Range is a simple enum with no edge cases
+
 }
 
-// MARK: - Performance Tests
-
 extension Memory.Map.Range.Test.Performance {
-    // Range is a simple enum with no performance-critical operations
+
 }

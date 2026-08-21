@@ -1,7 +1,3 @@
-// This source file is part of the swift-memory open source project
-// Copyright (c) 2024-2026 Coen ten Thije Boonkkamp and project authors
-// Licensed under Apache License v2.0
-
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
     internal import Darwin_Memory_Standard
 #elseif os(Linux)
@@ -9,7 +5,7 @@
 #endif
 
 extension Memory.Allocation {
-    /// Cross-platform allocation statistics with explicit observation semantics.
+
     public struct Statistics: Sendable, Equatable {
         public let allocations: Int
         public let deallocations: Int
@@ -36,8 +32,6 @@ extension Memory.Allocation {
     }
 }
 
-// MARK: - Nested Accessors
-
 extension Memory.Allocation.Statistics {
     public var bytes: Bytes { Bytes(self) }
     public var net: Net { Net(self) }
@@ -61,10 +55,8 @@ extension Memory.Allocation.Statistics.Net {
     public var allocations: Int { stats.allocations - stats.deallocations }
 }
 
-// MARK: - Capture and Delta
-
 extension Memory.Allocation.Statistics {
-    /// Capture current allocation statistics.
+
     public static func capture() -> Self {
         #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
             let statistics = Darwin.Memory.Allocation.Statistics.capture()
@@ -92,7 +84,6 @@ extension Memory.Allocation.Statistics {
         #endif
     }
 
-    /// Compute delta between two snapshots.
     public static func delta(from baseline: Self, to current: Self) -> Self {
         Self(
             allocations: current.allocations - baseline.allocations,

@@ -1,14 +1,3 @@
-// ===----------------------------------------------------------------------===//
-//
-// This source file is part of the swift-memory open source project
-//
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
-// Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// ===----------------------------------------------------------------------===//
-
 import Kernel
 import Kernel_Test_Support
 @_spi(MemoryInternal) import Memory_Map_Primitives
@@ -25,10 +14,7 @@ extension Memory.Map {
     }
 }
 
-// MARK: - Unit Tests
-
 extension Memory.Map.Test.Unit {
-    // MARK: - Anonymous Mapping Tests
 
     #if os(macOS) || os(Linux)
         @Test
@@ -181,8 +167,6 @@ extension Memory.Map.Test.Unit {
         }
     #endif
 
-    // MARK: - Buffer Access Tests (POSIX)
-
     #if os(macOS) || os(Linux)
         @Test
         func `withUnsafeBytes provides read access`() throws {
@@ -223,8 +207,6 @@ extension Memory.Map.Test.Unit {
         }
     #endif
 
-    // MARK: - File-Backed Mapping Tests (POSIX)
-
     #if os(macOS) || os(Linux)
         @Test
         func `file-backed mapping reads content`() throws {
@@ -242,7 +224,6 @@ extension Memory.Map.Test.Unit {
             let isMapped = map.isMapped
             let length = map.length
 
-            // Verify content
             let bytes = map.withUnsafeBytes { buffer -> [UInt8] in
                 Array(buffer)
             }
@@ -269,8 +250,7 @@ extension Memory.Map.Test.Unit {
                 safety: .unchecked
             )
 
-            // Modify the first byte
-            map[0] = 65  // 'A'
+            map[0] = 65
             try map.sync()
 
             let byte0 = map[0]
@@ -286,7 +266,6 @@ extension Memory.Map.Test.Unit {
             let content = "Original"
             let tempFile = try KernelIOTest.createTempFileWithContent(content)
 
-            // Map with private (CoW) sharing
             let map = try Memory.Map(
                 fileDescriptor: tempFile.descriptor,
                 range: .whole,
@@ -360,21 +339,13 @@ extension Memory.Map.Test.Unit {
         }
     #endif
 
-    // MARK: - Linux-specific io_uring Offset Mapping
-
     #if os(Linux)
         @Test
         func `mmap offset mapping for io_uring-style APIs`() throws {
-            // This tests the special init that takes an explicit mmap offset
-            // Used for io_uring ring buffer mappings where offset is not a file offset
-            // but a magic value that selects a specific region.
-            //
-            // We can't test with actual io_uring here, but we can test the API
-            // works for regular file offsets (which is a subset of the functionality).
+
             let content = Swift.String(repeating: "X", count: 8192)
             let tempFile = try KernelIOTest.createTempFileWithContent(content)
 
-            // Use mmap offset init with explicit offset (equivalent to regular mapping)
             let map = try Memory.Map(
                 fileDescriptor: tempFile.descriptor,
                 mmapOffset: Kernel.File.Offset(4096),
@@ -394,8 +365,6 @@ extension Memory.Map.Test.Unit {
         }
     #endif
 
-    // MARK: - Sync Tests
-
     #if os(macOS) || os(Linux)
         @Test
         func `sync on anonymous mapping`() throws {
@@ -403,11 +372,10 @@ extension Memory.Map.Test.Unit {
 
             map[0] = 42
 
-            // Sync on anonymous may fail on some platforms, but should not crash
             do throws(Memory.Error) {
                 try map.sync()
             } catch {
-                // Expected on some platforms (anonymous has no backing file)
+
             }
 
             map.unmap()
@@ -428,7 +396,6 @@ extension Memory.Map.Test.Unit {
 
             map[0] = 65
 
-            // Both sync modes should work
             try map.sync(async: false)
             try map.sync(async: true)
 
@@ -436,8 +403,6 @@ extension Memory.Map.Test.Unit {
             KernelIOTest.cleanupTempFile(tempFile)
         }
     #endif
-
-    // MARK: - Protection Tests
 
     #if os(macOS) || os(Linux)
         @Test
@@ -475,18 +440,15 @@ extension Memory.Map.Test.Unit {
         }
     #endif
 
-    // MARK: - Remap Tests
-
     #if os(macOS) || os(Linux)
         @Test
         func `remap to new range`() throws {
-            // Create file with 8KB of distinct content
+
             let firstHalf = Swift.String(repeating: "A", count: 4096)
             let secondHalf = Swift.String(repeating: "B", count: 4096)
             let content = firstHalf + secondHalf
             let tempFile = try KernelIOTest.createTempFileWithContent(content)
 
-            // Map first half
             var map = try Memory.Map(
                 fileDescriptor: tempFile.descriptor,
                 range: .bytes(offset: 0, length: 4096),
@@ -496,7 +458,6 @@ extension Memory.Map.Test.Unit {
 
             let firstByte = map[0]
 
-            // Remap to second half
             map = try map.remap(
                 fileDescriptor: tempFile.descriptor,
                 range: .bytes(offset: 4096, length: 4096)
@@ -512,8 +473,6 @@ extension Memory.Map.Test.Unit {
         }
     #endif
 
-    // MARK: - Debug Description
-
     #if os(macOS) || os(Linux)
         @Test
         func `debug description`() throws {
@@ -528,8 +487,6 @@ extension Memory.Map.Test.Unit {
         }
     #endif
 }
-
-// MARK: - Edge Case Tests
 
 extension Memory.Map.Test.`Edge Case` {
     #if os(macOS) || os(Linux)
@@ -561,24 +518,14 @@ extension Memory.Map.Test.`Edge Case` {
             let map = try Memory.Map(anonymousLength: 4096)
             let wasMapped = map.isMapped
 
-            // unmap() is a consuming operation on ~Copyable types
-            // After this call, 'map' is no longer accessible (compiler-enforced)
             map.unmap()
 
             #expect(wasMapped)
         }
 
-        // Note: "protect on unmapped throws" and "sync on unmapped throws" tests
-        // are not needed because Memory.Map is ~Copyable. Once unmap() consumes
-        // the map, the compiler prevents any further access - making these
-        // error conditions impossible at runtime.
-
-        // MARK: - Zero-length Edge Cases
-
         @Test
         func `zero-length bytes range behavior`() throws {
-            // Zero-length mappings are platform-specific
-            // On most platforms, mmap with length 0 fails
+
             let content = "Test content"
             let tempFile = try KernelIOTest.createTempFileWithContent(content)
 
@@ -594,30 +541,25 @@ extension Memory.Map.Test.`Edge Case` {
             KernelIOTest.cleanupTempFile(tempFile)
         }
 
-        // MARK: - Alignment Edge Cases
-
         @Test
         func `non-page-aligned length is rounded up`() throws {
             let map = try Memory.Map(anonymousLength: 100, access: [.read, .write])
 
-            // Internal mapping length should be page-aligned
-            // User-visible length should be the requested length
             let length = map.length
             let hasBase = map.baseAddress != nil
 
             map.unmap()
 
-            #expect(length == 100)  // User sees requested length
+            #expect(length == 100)
             #expect(hasBase)
         }
 
         @Test
         func `offset at allocation granularity boundary`() throws {
-            // Create file large enough to test offset alignment
-            let content = Swift.String(repeating: "X", count: 131072)  // 128KB
+
+            let content = Swift.String(repeating: "X", count: 131072)
             let tempFile = try KernelIOTest.createTempFileWithContent(content)
 
-            // Map at exact granularity boundary
             let offsetBytes: Int = Memory.Allocation.granularity.underlying.magnitude()
             let map = try Memory.Map(
                 fileDescriptor: tempFile.descriptor,
@@ -638,11 +580,10 @@ extension Memory.Map.Test.`Edge Case` {
 
         @Test
         func `non-granularity-aligned offset works`() throws {
-            // Create file large enough to test offset alignment
-            let content = Swift.String(repeating: "Y", count: 131072)  // 128KB
+
+            let content = Swift.String(repeating: "Y", count: 131072)
             let tempFile = try KernelIOTest.createTempFileWithContent(content)
 
-            // Map at non-aligned offset (internal alignment should handle this)
             let map = try Memory.Map(
                 fileDescriptor: tempFile.descriptor,
                 range: .bytes(offset: 1000, length: 4096),
@@ -652,7 +593,7 @@ extension Memory.Map.Test.`Edge Case` {
 
             let isMapped = map.isMapped
             let length = map.length
-            // The first byte should be at offset 1000 in the file
+
             let byte0 = map[0]
 
             map.unmap()
@@ -663,13 +604,10 @@ extension Memory.Map.Test.`Edge Case` {
             #expect(byte0 == Byte(UInt8(ascii: "Y")))
         }
 
-        // MARK: - Subscript Bounds Edge Cases
-
         @Test
         func `subscript at last valid index`() throws {
             let map = try Memory.Map(anonymousLength: 100, access: [.read, .write])
 
-            // Write and read at last valid index
             map[99] = 255
             let byte = map[99]
 
@@ -709,8 +647,6 @@ extension Memory.Map.Test.`Edge Case` {
             #expect(wasMapped)
         }
 
-        // MARK: - Alignment Edge Cases (Windows)
-
         @Test
         func `non-page-aligned length is rounded up (Windows)`() throws {
             let map = try Memory.Map.anonymous(length: 100, access: [.read, .write])
@@ -723,8 +659,6 @@ extension Memory.Map.Test.`Edge Case` {
             #expect(length == 100)
             #expect(hasBase)
         }
-
-        // MARK: - Subscript Bounds Edge Cases (Windows)
 
         @Test
         func `subscript at last valid index (Windows)`() throws {
@@ -751,8 +685,6 @@ extension Memory.Map.Test.`Edge Case` {
         }
     #endif
 }
-
-// MARK: - Performance Tests
 
 extension Memory.Map.Test.Performance {
     #if os(macOS) || os(Linux)

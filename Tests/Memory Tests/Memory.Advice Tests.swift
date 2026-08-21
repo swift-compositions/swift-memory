@@ -1,14 +1,3 @@
-// ===----------------------------------------------------------------------===//
-//
-// This source file is part of the swift-memory open source project
-//
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
-// Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// ===----------------------------------------------------------------------===//
-
 import Kernel
 import Testing
 
@@ -22,8 +11,6 @@ extension Memory.Advice {
         @Suite(.serialized) struct Performance {}
     }
 }
-
-// MARK: - Unit Tests
 
 #if os(macOS) || os(Linux)
     extension Memory.Advice.Test.Unit {
@@ -84,15 +71,10 @@ extension Memory.Advice {
     }
 #endif
 
-// MARK: - Edge Case Tests
-
 extension Memory.Advice.Test.`Edge Case` {
-    // Advice on unmapped region is a no-op (guard pattern in advise)
-    // No error thrown, just returns early
+
 }
 
-// MARK: - Performance Tests
-
 extension Memory.Advice.Test.Performance {
-    // Advice operations are system calls, no meaningful perf test
+
 }

@@ -1,31 +1,13 @@
-// ===----------------------------------------------------------------------===//
-//
-// This source file is part of the swift-memory open source project
-//
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
-// Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// ===----------------------------------------------------------------------===//
-
 public import Kernel
 
-// Memory.Shared namespace is declared at L1 (swift-memory-primitives).
-// L3 extends it with policy-layer types (Mode, Access, Options, open(), unlink()).
-
-// MARK: - Open Mode
-
 extension Memory.Shared {
-    /// Mode for opening shared memory objects.
+
     public struct Mode: Sendable, Equatable {
-        /// Access mode (read, write, or both).
+
         public let access: Memory.Shared.Access
 
-        /// Creation options (create, exclusive, truncate).
         public let options: Memory.Shared.Options
 
-        /// Permission mode for creation (POSIX only).
         public let permissions: Kernel.File.Permissions
 
         public init(
@@ -41,23 +23,14 @@ extension Memory.Shared {
 }
 
 extension Memory.Shared.Mode {
-    /// Open existing read-only.
+
     public static let read = Self(access: .read)
 
-    /// Nested accessor for create modes.
     public static var create: Create.Type { Create.self }
 }
 
-// MARK: - ExpressibleByArrayLiteral
-
 extension Memory.Shared.Mode: ExpressibleByArrayLiteral {
-    /// Creates a mode from an array literal of access flags.
-    ///
-    /// This allows concise mode specification:
-    /// ```swift
-    /// mode: [.read, .write]  // read-write access, no options
-    /// mode: [.read]          // read-only access
-    /// ```
+
     public init(arrayLiteral elements: Memory.Shared.Access...) {
         var read = false
         var write = false
@@ -69,18 +42,13 @@ extension Memory.Shared.Mode: ExpressibleByArrayLiteral {
     }
 }
 
-// MARK: - Create Modes
-
 extension Memory.Shared.Mode {
-    /// Create mode variants for shared memory.
-    ///
-    /// These provide convenience statics for common creation patterns.
-    /// For full control, use `Mode(access:options:permissions:)` directly.
+
     public enum Create {}
 }
 
 extension Memory.Shared.Mode.Create {
-    /// Create exclusively (fails if exists) with read-write access.
+
     public static var exclusive: Memory.Shared.Mode {
         Memory.Shared.Mode(
             access: .readWrite,
@@ -88,9 +56,6 @@ extension Memory.Shared.Mode.Create {
         )
     }
 
-    /// Create with truncate (if exists) with read-write access.
-    ///
-    /// - Note: On Windows, truncate is ignored. The size is fixed at creation.
     public static var truncate: Memory.Shared.Mode {
         Memory.Shared.Mode(
             access: .readWrite,
@@ -99,40 +64,15 @@ extension Memory.Shared.Mode.Create {
     }
 }
 
-// MARK: - POSIX Operations
-
 #if !os(Windows)
 
     extension Memory.Shared {
-        /// Opens or creates a POSIX shared memory object.
-        ///
-        /// - Parameters:
-        ///   - name: The name of the shared memory object (must start with '/').
-        ///   - mode: The open mode and permissions.
-        /// - Returns: A file descriptor for the shared memory object.
-        /// - Throws: `Memory.Error` if the operation fails.
-        ///
-        /// ## Name Requirements
-        ///
-        /// The name must:
-        /// - Start with a forward slash ('/')
-        /// - Not contain additional slashes
-        /// - Not exceed `NAME_MAX` characters (typically 255)
-        ///
-        /// ## Example
-        ///
-        /// ```swift
-        /// let shm = try Memory.Shared.open(
-        ///     name: "/my-ipc-buffer",
-        ///     mode: .create.exclusive
-        /// )
-        /// ```
+
         public static func open(
             name: Swift.String,
             mode: Mode
         ) throws(Memory.Error) -> Kernel.Descriptor {
-            // Avoid Result<Kernel.Descriptor, ...> — Result requires Copyable.
-            // withCString also requires Copyable return, so capture via side channel.
+
             var fd: Kernel.Descriptor? = nil
             var openError: Memory.Shared.Error? = nil
             name.withCString { namePtr in
@@ -156,13 +96,6 @@ extension Memory.Shared.Mode.Create {
             preconditionFailure("unreachable: withCString must set fd or openError")
         }
 
-        /// Removes a POSIX shared memory object.
-        ///
-        /// The shared memory object is unlinked from the filesystem namespace.
-        /// Existing mappings remain valid until all processes unmap them.
-        ///
-        /// - Parameter name: The name of the shared memory object to remove.
-        /// - Throws: `Memory.Error` if the operation fails.
         public static func unlink(name: Swift.String) throws(Memory.Error) {
             var unlinkError: Memory.Shared.Error?
             name.withCString { namePtr in
@@ -180,36 +113,10 @@ extension Memory.Shared.Mode.Create {
 
 #endif
 
-// MARK: - Windows Operations
-
 #if os(Windows)
 
     extension Memory.Shared {
-        /// Creates or opens a named shared memory object on Windows.
-        ///
-        /// - Parameters:
-        ///   - name: The name of the shared memory object.
-        ///     Use "Local\\" prefix for session-local or "Global\\" for system-wide.
-        ///   - size: The size of the shared memory region (required on Windows).
-        ///   - mode: The open mode.
-        /// - Returns: A descriptor for the shared memory object.
-        /// - Throws: `Memory.Error` if the operation fails.
-        ///
-        /// ## Name Format
-        ///
-        /// Unlike POSIX, Windows names don't require a "/" prefix:
-        /// - `"Local\\my-buffer"` - visible only in current session
-        /// - `"Global\\my-buffer"` - visible system-wide (requires privileges)
-        ///
-        /// ## Example
-        ///
-        /// ```swift
-        /// let shm = try Memory.Shared.open(
-        ///     name: "Local\\my-ipc-buffer",
-        ///     size: 4096,
-        ///     mode: .create.exclusive
-        /// )
-        /// ```
+
         public static func open(
             name: Swift.String,
             size: Kernel.File.Size,
@@ -227,13 +134,6 @@ extension Memory.Shared.Mode.Create {
             }
         }
 
-        /// Opens an existing named shared memory object on Windows.
-        ///
-        /// - Parameters:
-        ///   - name: The name of the shared memory object.
-        ///   - mode: The open mode (only access is used; options ignored).
-        /// - Returns: A descriptor for the shared memory object.
-        /// - Throws: `Memory.Error` if the operation fails.
         public static func open(
             name: Swift.String,
             mode: Mode
@@ -248,20 +148,6 @@ extension Memory.Shared.Mode.Create {
             }
         }
 
-        /// Closes a shared memory object handle.
-        ///
-        /// On Windows, shared memory objects are reference-counted.
-        /// The object is deleted when all handles are closed.
-        ///
-        /// - Note: This is different from POSIX where `unlink` removes the name
-        ///   but the object persists until all mappings are unmapped.
-        ///
-        /// - Parameter descriptor: The descriptor to close.
-        /// - Throws: `Kernel.Close.Error` if the handle cannot be closed.
-        ///
-        /// Explicit close with error reporting is owned by `Kernel.Close`; this
-        /// spelling exists so a caller who reached the descriptor through
-        /// `Memory.Shared.open` finds the release in the same namespace.
         public static func close(
             _ descriptor: consuming Kernel.Descriptor
         ) throws(Kernel.Close.Error) {

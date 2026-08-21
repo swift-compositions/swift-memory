@@ -1,14 +1,3 @@
-// ===----------------------------------------------------------------------===//
-//
-// This source file is part of the swift-memory open source project
-//
-// Copyright (c) 2024 Coen ten Thije Boonkkamp and the swift-memory project authors
-// Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// ===----------------------------------------------------------------------===//
-
 import Testing
 
 @testable import Memory
@@ -21,8 +10,6 @@ extension Memory.Map.Access {
         @Suite(.serialized) struct Performance {}
     }
 }
-
-// MARK: - Unit Tests
 
 extension Memory.Map.Access.Test.Unit {
     @Test
@@ -50,17 +37,15 @@ extension Memory.Map.Access.Test.Unit {
     func `read-only validates`() throws {
         let access: Memory.Map.Access = .read
         try access.validate()
-        // Should not throw
+
     }
 
     @Test
     func `read-write validates`() throws {
         let access: Memory.Map.Access = [.read, .write]
         try access.validate()
-        // Should not throw
-    }
 
-    // Memory.Map.Protection conversions are tested in swift-kernel
+    }
 
     @Test
     func `empty access`() {
@@ -87,8 +72,6 @@ extension Memory.Map.Access.Test.Unit {
     }
 }
 
-// MARK: - Edge Case Tests
-
 extension Memory.Map.Access.Test.`Edge Case` {
     @Test
     func `write-only validation fails`() {
@@ -102,13 +85,11 @@ extension Memory.Map.Access.Test.`Edge Case` {
     @Test
     func `empty access validation succeeds`() throws {
         let access: Memory.Map.Access = []
-        // Empty access is technically valid (no write without read)
+
         try access.validate()
     }
 }
 
-// MARK: - Performance Tests
-
 extension Memory.Map.Access.Test.Performance {
-    // Access is a simple OptionSet with no performance-critical operations
+
 }
