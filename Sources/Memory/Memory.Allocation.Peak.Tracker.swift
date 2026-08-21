@@ -34,7 +34,6 @@ extension Memory.Allocation.Peak {
 
         /// Initialize a peak memory tracker.
         public init() {
-            Memory.Allocation.Statistics.ensureTracking()
             self.baseline = Memory.Allocation.Statistics.capture()
             self.state = Mutex(State())
         }

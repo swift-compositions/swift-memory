@@ -1,28 +1,37 @@
-// ===----------------------------------------------------------------------===//
-//
 // This source file is part of the swift-memory open source project
-//
-// Copyright (c) 2024-2026 Coen ten Thije Boonkkamp and the swift-memory project authors
+// Copyright (c) 2024-2026 Coen ten Thije Boonkkamp and project authors
 // Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// ===----------------------------------------------------------------------===//
+
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+    internal import Darwin_Memory_Standard
+#elseif os(Linux)
+    internal import Linux_Memory_Standard
+#endif
 
 extension Memory.Allocation {
-    /// Cross-platform allocation statistics.
-    ///
-    /// Current implementation is a stub returning zero values.
-    /// Future: delegate to platform-specific statistics via Kernel.
+    /// Cross-platform allocation statistics with explicit observation semantics.
     public struct Statistics: Sendable, Equatable {
         public let allocations: Int
         public let deallocations: Int
         public let bytesAllocated: Int
+        public let availability: Availability
+        public let scope: Scope
+        public let instrumentation: Instrumentation
 
-        public init(allocations: Int = 0, deallocations: Int = 0, bytesAllocated: Int = 0) {
+        public init(
+            allocations: Int = 0,
+            deallocations: Int = 0,
+            bytesAllocated: Int = 0,
+            availability: Availability = .unavailable,
+            scope: Scope = .none,
+            instrumentation: Instrumentation = .none
+        ) {
             self.allocations = allocations
             self.deallocations = deallocations
             self.bytesAllocated = bytesAllocated
+            self.availability = availability
+            self.scope = scope
+            self.instrumentation = instrumentation
         }
     }
 }
@@ -52,23 +61,51 @@ extension Memory.Allocation.Statistics.Net {
     public var allocations: Int { stats.allocations - stats.deallocations }
 }
 
-// MARK: - Capture and Delta (Stub)
+// MARK: - Capture and Delta
 
 extension Memory.Allocation.Statistics {
     /// Capture current allocation statistics.
-    /// Stub: returns zeros. Future: delegate to Kernel platform statistics.
-    public static func capture() -> Self { Self() }
+    public static func capture() -> Self {
+        #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+            let statistics = Darwin.Memory.Allocation.Statistics.capture()
+            return Self(
+                allocations: statistics.allocations,
+                deallocations: statistics.deallocations,
+                bytesAllocated: statistics.bytesAllocated,
+                availability: .available,
+                scope: .process,
+                instrumentation: .snapshot
+            )
+        #elseif os(Linux)
+            Linux.Memory.Allocation.Statistics.startTracking()
+            let statistics = Linux.Memory.Allocation.Statistics.capture()
+            return Self(
+                allocations: statistics.allocations,
+                deallocations: statistics.deallocations,
+                bytesAllocated: statistics.bytesAllocated,
+                availability: .available,
+                scope: .thread,
+                instrumentation: .interposed
+            )
+        #else
+            return Self()
+        #endif
+    }
 
     /// Compute delta between two snapshots.
     public static func delta(from baseline: Self, to current: Self) -> Self {
         Self(
             allocations: current.allocations - baseline.allocations,
             deallocations: current.deallocations - baseline.deallocations,
-            bytesAllocated: current.bytesAllocated - baseline.bytesAllocated
+            bytesAllocated: current.bytesAllocated - baseline.bytesAllocated,
+            availability:
+                baseline.availability == .available && current.availability == .available
+                ? .available : .unavailable,
+            scope: baseline.scope == current.scope ? current.scope : .none,
+            instrumentation:
+                baseline.instrumentation == current.instrumentation
+                ? current.instrumentation : .none
         )
     }
 
-    /// Ensure platform tracking is active.
-    /// Stub: no-op. Future: install malloc hooks via Kernel.
-    public static func ensureTracking() {}
 }

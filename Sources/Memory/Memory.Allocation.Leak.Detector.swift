@@ -34,7 +34,6 @@ extension Memory.Allocation.Leak {
         ///
         /// Captures baseline allocation statistics at initialization.
         public init() {
-            Memory.Allocation.Statistics.ensureTracking()
             self.baseline = Memory.Allocation.Statistics.capture()
         }
     }

@@ -20,6 +20,14 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/swift-foundations/swift-kernel.git", branch: "main"),
         .package(
+            url: "https://github.com/swift-standards/swift-darwin-standard.git",
+            branch: "main"
+        ),
+        .package(
+            url: "https://github.com/swift-linux-foundation/swift-linux-standard.git",
+            branch: "main"
+        ),
+        .package(
             url: "https://github.com/swift-primitives/swift-memory-primitives.git",
             branch: "main"
         ),
@@ -48,6 +56,16 @@ let package = Package(
                     package: "swift-memory-shared-primitives"
                 ),
                 .product(name: "Memory Map Primitives", package: "swift-memory-map-primitives"),
+                .product(
+                    name: "Darwin Memory Standard",
+                    package: "swift-darwin-standard",
+                    condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS, .visionOS])
+                ),
+                .product(
+                    name: "Linux Memory Standard",
+                    package: "swift-linux-standard",
+                    condition: .when(platforms: [.linux])
+                ),
             ]
         ),
         .testTarget(
