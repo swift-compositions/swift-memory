@@ -32,6 +32,10 @@ let package = Package(
             branch: "main"
         ),
         .package(
+            url: "https://github.com/swift-primitives/swift-memory-allocation-primitives.git",
+            branch: "main"
+        ),
+        .package(
             url: "https://github.com/swift-primitives/swift-memory-lock-primitives.git",
             branch: "main"
         ),
@@ -50,6 +54,10 @@ let package = Package(
             dependencies: [
                 .product(name: "Kernel", package: "swift-kernel"),
                 .product(name: "Memory Primitives", package: "swift-memory-primitives"),
+                .product(
+                    name: "Memory Allocation Primitive",
+                    package: "swift-memory-allocation-primitives"
+                ),
                 .product(name: "Memory Lock Primitives", package: "swift-memory-lock-primitives"),
                 .product(
                     name: "Memory Shared Primitives",
