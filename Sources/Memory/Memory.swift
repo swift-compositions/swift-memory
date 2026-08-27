@@ -1,6 +1,6 @@
 public import Kernel
 public import Memory_Allocation_Primitive
-import Memory_Primitives
+import Memory
 
 extension Memory {
 

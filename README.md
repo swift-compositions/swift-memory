@@ -67,7 +67,7 @@ Add swift-memory to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/swift-foundations/swift-memory", branch: "main")
+    .package(url: "https://github.com/swift-compositions/swift-memory", branch: "main")
 ]
 ```
 
@@ -430,14 +430,14 @@ swift-memory is part of a layered systems programming stack:
 
 | Package | Role |
 |---------|------|
-| [swift-kernel](https://github.com/swift-foundations/swift-kernel) | Syscall substrate: raw wrappers for `mmap`, `shm_open`, `CreateFileMapping`, etc. |
-| **swift-memory** | Memory primitives: RAII mappings, shared memory, page locking |
+| [swift-kernel](https://github.com/swift-compositions/swift-kernel) | Syscall substrate: raw wrappers for `mmap`, `shm_open`, `CreateFileMapping`, etc. |
+| **swift-memory** | Memory composition: RAII mappings, shared memory, page locking |
 | swift-io | Async I/O built on mapped memory where appropriate |
 
 The separation ensures each layer has a single responsibility:
 - swift-kernel provides platform abstraction without policy
 - swift-memory adds safety and ergonomics without async complexity
-- Higher layers build on these foundations for specific use cases
+- Consumers build on this composition for specific use cases
 
 ## License
 

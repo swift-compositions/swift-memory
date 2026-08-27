@@ -18,7 +18,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/swift-foundations/swift-kernel.git", branch: "main"),
+        .package(url: "https://github.com/swift-compositions/swift-kernel.git", branch: "main"),
         .package(
             url: "https://github.com/swift-standards/swift-darwin-standard.git",
             branch: "main"
@@ -28,23 +28,23 @@ let package = Package(
             branch: "main"
         ),
         .package(
-            url: "https://github.com/swift-primitives/swift-memory-primitives.git",
+            url: "https://github.com/swift-molecules/swift-memory.git",
             branch: "main"
         ),
         .package(
-            url: "https://github.com/swift-primitives/swift-memory-allocation-primitives.git",
+            url: "https://github.com/swift-molecules/swift-memory-allocation.git",
             branch: "main"
         ),
         .package(
-            url: "https://github.com/swift-primitives/swift-memory-lock-primitives.git",
+            url: "https://github.com/swift-molecules/swift-memory-lock.git",
             branch: "main"
         ),
         .package(
-            url: "https://github.com/swift-primitives/swift-memory-shared-primitives.git",
+            url: "https://github.com/swift-molecules/swift-memory-shared.git",
             branch: "main"
         ),
         .package(
-            url: "https://github.com/swift-primitives/swift-memory-map-primitives.git",
+            url: "https://github.com/swift-molecules/swift-memory-map.git",
             branch: "main"
         ),
     ],
@@ -53,17 +53,17 @@ let package = Package(
             name: "Memory",
             dependencies: [
                 .product(name: "Kernel", package: "swift-kernel"),
-                .product(name: "Memory Primitives", package: "swift-memory-primitives"),
+                .product(name: "Memory", package: "swift-memory"),
                 .product(
                     name: "Memory Allocation Primitive",
-                    package: "swift-memory-allocation-primitives"
+                    package: "swift-memory-allocation"
                 ),
-                .product(name: "Memory Lock Primitives", package: "swift-memory-lock-primitives"),
+                .product(name: "Memory Lock", package: "swift-memory-lock"),
                 .product(
-                    name: "Memory Shared Primitives",
-                    package: "swift-memory-shared-primitives"
+                    name: "Memory Shared",
+                    package: "swift-memory-shared"
                 ),
-                .product(name: "Memory Map Primitives", package: "swift-memory-map-primitives"),
+                .product(name: "Memory Map", package: "swift-memory-map"),
                 .product(
                     name: "Darwin Memory Standard",
                     package: "swift-darwin-standard",
