@@ -1,4 +1,4 @@
-# swift-memory
+# swift-memory-mapping
 
 Safe, ergonomic memory-mapped file I/O and shared memory for Swift.
 
@@ -31,7 +31,7 @@ Use memory mapping when:
 - Sharing memory between processes (IPC)
 - Creating copy-on-write snapshots of file data
 
-swift-memory provides a policy layer over raw syscalls with:
+swift-memory-mapping provides a policy layer over raw syscalls with:
 
 - **Move-only semantics** (`~Copyable`) ensuring mappings cannot be accidentally copied
 - **RAII lifetime management** with automatic cleanup on scope exit
@@ -41,7 +41,7 @@ Safety modes control coordination guarantees, not memory bounds checking or data
 
 ## Non-Goals
 
-swift-memory is not:
+swift-memory-mapping is not:
 
 - **A serialization layer** - It provides raw byte access, not structured data encoding
 - **A cross-process object model** - Shared memory gives you bytes; synchronization and protocol are your responsibility
@@ -63,11 +63,11 @@ swift-memory is not:
 
 ## Installation
 
-Add swift-memory to your `Package.swift`:
+Add swift-memory-mapping to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/swift-compositions/swift-memory", branch: "main")
+    .package(url: "https://github.com/swift-compositions/swift-memory-mapping.git", branch: "main")
 ]
 ```
 
@@ -79,7 +79,7 @@ Then add the dependency to your target:
 .target(
     name: "YourTarget",
     dependencies: [
-        .product(name: "Memory", package: "swift-memory")
+        .product(name: "Memory Mapping", package: "swift-memory-mapping")
     ]
 )
 ```
@@ -89,7 +89,7 @@ Requires Swift 6.0+.
 ## Quick Start
 
 ```swift
-import Memory
+import Memory_Mapping
 import Kernel
 
 // Map a file for reading
@@ -234,7 +234,7 @@ let shm = try Memory.Shared.open(name: "/my-buffer", mode: [.read, .write])
 
 ## Error Handling
 
-swift-memory uses typed throws with `Memory.Error`:
+swift-memory-mapping uses typed throws with `Memory.Error`:
 
 ```swift
 do {
@@ -426,17 +426,17 @@ Non-aligned offsets work correctly; the library handles internal adjustment.
 
 ## Related Packages
 
-swift-memory is part of a layered systems programming stack:
+swift-memory-mapping is part of a layered systems programming stack:
 
 | Package | Role |
 |---------|------|
 | [swift-kernel](https://github.com/swift-compositions/swift-kernel) | Syscall substrate: raw wrappers for `mmap`, `shm_open`, `CreateFileMapping`, etc. |
-| **swift-memory** | Memory composition: RAII mappings, shared memory, page locking |
+| **swift-memory-mapping** | Memory composition: RAII mappings, shared memory, page locking |
 | swift-io | Async I/O built on mapped memory where appropriate |
 
 The separation ensures each layer has a single responsibility:
 - swift-kernel provides platform abstraction without policy
-- swift-memory adds safety and ergonomics without async complexity
+- swift-memory-mapping adds safety and ergonomics without async complexity
 - Consumers build on this composition for specific use cases
 
 ## License

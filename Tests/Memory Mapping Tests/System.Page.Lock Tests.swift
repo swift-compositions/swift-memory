@@ -1,6 +1,6 @@
 import Testing
 
-@testable import Memory
+@testable import Memory_Mapping
 
 extension System.Page.Lock {
     enum Test {

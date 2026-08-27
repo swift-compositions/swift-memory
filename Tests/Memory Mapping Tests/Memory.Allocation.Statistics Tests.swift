@@ -1,6 +1,6 @@
 import Testing
 
-@testable import Memory
+@testable import Memory_Mapping
 
 extension Memory.Test.Unit {
     @Test func `allocation delta preserves observation semantics`() {

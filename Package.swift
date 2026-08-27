@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "swift-memory",
+    name: "swift-memory-mapping",
     platforms: [
         .macOS(.v27),
         .iOS(.v27),
@@ -13,8 +13,8 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "Memory",
-            targets: ["Memory"]
+            name: "Memory Mapping",
+            targets: ["Memory Mapping"]
         )
     ],
     dependencies: [
@@ -50,7 +50,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "Memory",
+            name: "Memory Mapping",
             dependencies: [
                 .product(name: "Kernel", package: "swift-kernel"),
                 .product(name: "Memory", package: "swift-memory"),
@@ -77,9 +77,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "Memory Tests",
+            name: "Memory Mapping Tests",
             dependencies: [
-                "Memory",
+                "Memory Mapping",
                 .product(name: "Kernel Test Support", package: "swift-kernel"),
             ]
         ),

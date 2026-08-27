@@ -1,7 +1,7 @@
 import Kernel
 import Testing
 
-@testable import Memory
+@testable import Memory_Mapping
 
 extension Memory.Error {
     enum Test {

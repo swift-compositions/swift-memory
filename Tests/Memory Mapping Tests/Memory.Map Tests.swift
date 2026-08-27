@@ -3,7 +3,7 @@ import Kernel_Test_Support
 @_spi(MemoryInternal) import Memory_Map
 import Testing
 
-@testable import Memory
+@testable import Memory_Mapping
 
 extension Memory.Map {
     enum Test {
